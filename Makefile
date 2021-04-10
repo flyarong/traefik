@@ -13,7 +13,7 @@ GIT_BRANCH := $(subst heads/,,$(shell git rev-parse --abbrev-ref HEAD 2>/dev/nul
 TRAEFIK_DEV_IMAGE := traefik-dev$(if $(GIT_BRANCH),:$(subst /,-,$(GIT_BRANCH)))
 
 REPONAME := $(shell echo $(REPO) | tr '[:upper:]' '[:lower:]')
-TRAEFIK_IMAGE := $(if $(REPONAME),$(REPONAME),"containous/traefik")
+TRAEFIK_IMAGE := $(if $(REPONAME),$(REPONAME),"traefik/traefik")
 
 INTEGRATION_OPTS := $(if $(MAKE_DOCKER_HOST),-e "DOCKER_HOST=$(MAKE_DOCKER_HOST)", -e "TEST_CONTAINER=1" -v "/var/run/docker.sock:/var/run/docker.sock")
 DOCKER_BUILD_ARGS := $(if $(DOCKER_VERSION), "--build-arg=DOCKER_VERSION=$(DOCKER_VERSION)",)
@@ -29,13 +29,15 @@ TRAEFIK_ENVS := \
 	-e CI \
 	-e CONTAINER=DOCKER		# Indicator for integration tests that we are running inside a container.
 
-TRAEFIK_MOUNT := -v "$(CURDIR)/$(BIND_DIR):/go/src/github.com/containous/traefik/$(BIND_DIR)"
+TRAEFIK_MOUNT := -v "$(CURDIR)/$(BIND_DIR):/go/src/github.com/traefik/traefik/$(BIND_DIR)"
 DOCKER_RUN_OPTS := $(TRAEFIK_ENVS) $(TRAEFIK_MOUNT) "$(TRAEFIK_DEV_IMAGE)"
 DOCKER_NON_INTERACTIVE ?= false
 DOCKER_RUN_TRAEFIK := docker run --add-host=host.docker.internal:127.0.0.1 $(INTEGRATION_OPTS) $(if $(DOCKER_NON_INTERACTIVE), , -it) $(DOCKER_RUN_OPTS)
 DOCKER_RUN_TRAEFIK_NOTTY := docker run $(INTEGRATION_OPTS) $(if $(DOCKER_NON_INTERACTIVE), , -i) $(DOCKER_RUN_OPTS)
 
 PRE_TARGET ?= build-dev-image
+
+PLATFORM_URL := $(if $(PLATFORM_URL),$(PLATFORM_URL),"https://pilot.traefik.io")
 
 default: binary
 
@@ -53,7 +55,7 @@ dist:
 
 ## Build WebUI Docker image
 build-webui-image:
-	docker build -t traefik-webui -f webui/Dockerfile webui
+	docker build -t traefik-webui --build-arg ARG_PLATFORM_URL=$(PLATFORM_URL) -f webui/Dockerfile webui
 
 ## Generate WebUI
 generate-webui: build-webui-image
@@ -61,18 +63,18 @@ generate-webui: build-webui-image
 		mkdir -p static; \
 		docker run --rm -v "$$PWD/static":'/src/static' traefik-webui npm run build:nc; \
 		docker run --rm -v "$$PWD/static":'/src/static' traefik-webui chown -R $(shell id -u):$(shell id -g) ../static; \
-		echo 'For more informations show `webui/readme.md`' > $$PWD/static/DONT-EDIT-FILES-IN-THIS-DIRECTORY.md; \
+		echo 'For more information show `webui/readme.md`' > $$PWD/static/DONT-EDIT-FILES-IN-THIS-DIRECTORY.md; \
 	fi
 
 ## Build the linux binary
 binary: generate-webui $(PRE_TARGET)
 	$(if $(PRE_TARGET),$(DOCKER_RUN_TRAEFIK)) ./script/make.sh generate binary
 
-## Build the binary for the standard plaforms (linux, darwin, windows)
+## Build the binary for the standard platforms (linux, darwin, windows)
 crossbinary-default: generate-webui build-dev-image
 	$(DOCKER_RUN_TRAEFIK_NOTTY) ./script/make.sh generate crossbinary-default
 
-## Build the binary for the standard plaforms (linux, darwin, windows) in parallel
+## Build the binary for the standard platforms (linux, darwin, windows) in parallel
 crossbinary-default-parallel:
 	$(MAKE) generate-webui
 	$(MAKE) build-dev-image crossbinary-default
@@ -124,6 +126,10 @@ docs:
 ## Serve the documentation site localy
 docs-serve:
 	make -C ./docs docs-serve
+
+## Pull image for doc building
+docs-pull-images:
+	make -C ./docs docs-pull-images
 
 ## Generate CRD clientset
 generate-crd:

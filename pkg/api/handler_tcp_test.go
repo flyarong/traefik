@@ -3,16 +3,17 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/config/runtime"
-	"github.com/containous/traefik/v2/pkg/config/static"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/config/runtime"
+	"github.com/traefik/traefik/v2/pkg/config/static"
 )
 
 func TestHandler_TCP(t *testing.T) {
@@ -534,7 +535,7 @@ func TestHandler_TCP(t *testing.T) {
 
 			assert.Equal(t, resp.Header.Get("Content-Type"), "application/json")
 
-			contents, err := ioutil.ReadAll(resp.Body)
+			contents, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
 			err = resp.Body.Close()
@@ -548,11 +549,11 @@ func TestHandler_TCP(t *testing.T) {
 				newJSON, err := json.MarshalIndent(results, "", "\t")
 				require.NoError(t, err)
 
-				err = ioutil.WriteFile(test.expected.jsonFile, newJSON, 0o644)
+				err = os.WriteFile(test.expected.jsonFile, newJSON, 0o644)
 				require.NoError(t, err)
 			}
 
-			data, err := ioutil.ReadFile(test.expected.jsonFile)
+			data, err := os.ReadFile(test.expected.jsonFile)
 			require.NoError(t, err)
 			assert.JSONEq(t, string(data), string(contents))
 		})

@@ -3,16 +3,16 @@ package auth
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
 )
 
 func TestDigestAuthError(t *testing.T) {
@@ -93,9 +93,8 @@ func TestDigestAuthUsersFromFile(t *testing.T) {
 			t.Parallel()
 
 			// Creates the temporary configuration file with the users
-			usersFile, err := ioutil.TempFile("", "auth-users")
+			usersFile, err := os.CreateTemp(t.TempDir(), "auth-users")
 			require.NoError(t, err)
-			defer os.Remove(usersFile.Name())
 
 			_, err = usersFile.Write([]byte(test.userFileContent))
 			require.NoError(t, err)
@@ -127,7 +126,7 @@ func TestDigestAuthUsersFromFile(t *testing.T) {
 				require.Equal(t, http.StatusOK, res.StatusCode, "Cannot authenticate user "+userName)
 
 				var body []byte
-				body, err = ioutil.ReadAll(res.Body)
+				body, err = io.ReadAll(res.Body)
 				require.NoError(t, err)
 				err = res.Body.Close()
 				require.NoError(t, err)
@@ -145,7 +144,7 @@ func TestDigestAuthUsersFromFile(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 			var body []byte
-			body, err = ioutil.ReadAll(res.Body)
+			body, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 			err = res.Body.Close()
 			require.NoError(t, err)

@@ -231,8 +231,9 @@
               <div class="text-subtitle2">Service</div>
               <q-chip
                 dense
-                class="app-chip app-chip-green">
+                class="app-chip app-chip-green app-chip-overflow">
                 {{ exData(middleware).service }}
+                <q-tooltip>{{ exData(middleware).service }}</q-tooltip>
               </q-chip>
             </div>
           </div>
@@ -305,6 +306,20 @@
             </div>
           </div>
         </q-card-section>
+        <!-- EXTRA FIELDS FROM MIDDLEWARES - [forwardAuth] - authRequestHeaders -->
+        <q-card-section v-if="middleware.forwardAuth">
+          <div class="row items-start no-wrap">
+            <div class="col">
+              <div class="text-subtitle2">Auth Request Headers</div>
+              <q-chip
+                v-for="(reqHeader, key) in exData(middleware).authRequestHeaders" :key="key"
+                dense
+                class="app-chip app-chip-green">
+                {{ reqHeader }}
+              </q-chip>
+            </div>
+          </div>
+        </q-card-section>
 
         <!-- EXTRA FIELDS FROM MIDDLEWARES - [headers] - customRequestHeaders -->
         <q-card-section v-if="middleware.headers">
@@ -315,7 +330,7 @@
                 v-for="(val, key) in exData(middleware).customRequestHeaders" :key="key"
                 dense
                 class="app-chip app-chip-green">
-                {{ val }}
+                {{ key }}: {{ val }}
               </q-chip>
             </div>
           </div>
@@ -329,7 +344,7 @@
                 v-for="(val, key) in exData(middleware).customResponseHeaders" :key="key"
                 dense
                 class="app-chip app-chip-green">
-                {{ val }}
+                {{ key }}: {{ val }}
               </q-chip>
             </div>
           </div>

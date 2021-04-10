@@ -2,33 +2,38 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/go-kit/kit/metrics"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 const (
-	// MetricNamePrefix prefix of all metric names
+	// MetricNamePrefix prefix of all metric names.
 	MetricNamePrefix = "traefik_"
 
-	// server meta information
+	// server meta information.
 	metricConfigPrefix             = MetricNamePrefix + "config_"
 	configReloadsTotalName         = metricConfigPrefix + "reloads_total"
 	configReloadsFailuresTotalName = metricConfigPrefix + "reloads_failure_total"
 	configLastReloadSuccessName    = metricConfigPrefix + "last_reload_success"
 	configLastReloadFailureName    = metricConfigPrefix + "last_reload_failure"
 
-	// entry point
+	// TLS.
+	metricsTLSPrefix          = MetricNamePrefix + "tls_"
+	tlsCertsNotAfterTimestamp = metricsTLSPrefix + "certs_not_after"
+
+	// entry point.
 	metricEntryPointPrefix     = MetricNamePrefix + "entrypoint_"
 	entryPointReqsTotalName    = metricEntryPointPrefix + "requests_total"
 	entryPointReqsTLSTotalName = metricEntryPointPrefix + "requests_tls_total"
@@ -37,7 +42,7 @@ const (
 
 	// service level.
 
-	// MetricServicePrefix prefix of all service metric names
+	// MetricServicePrefix prefix of all service metric names.
 	MetricServicePrefix     = MetricNamePrefix + "service_"
 	serviceReqsTotalName    = MetricServicePrefix + "requests_total"
 	serviceReqsTLSTotalName = MetricServicePrefix + "requests_tls_total"
@@ -74,12 +79,15 @@ func RegisterPrometheus(ctx context.Context, config *types.Prometheus) Registry 
 	standardRegistry := initStandardRegistry(config)
 
 	if err := promRegistry.Register(stdprometheus.NewProcessCollector(stdprometheus.ProcessCollectorOpts{})); err != nil {
-		if _, ok := err.(stdprometheus.AlreadyRegisteredError); !ok {
+		var arErr stdprometheus.AlreadyRegisteredError
+		if !errors.As(err, &arErr) {
 			log.FromContext(ctx).Warn("ProcessCollector is already registered")
 		}
 	}
+
 	if err := promRegistry.Register(stdprometheus.NewGoCollector()); err != nil {
-		if _, ok := err.(stdprometheus.AlreadyRegisteredError); !ok {
+		var arErr stdprometheus.AlreadyRegisteredError
+		if !errors.As(err, &arErr) {
 			log.FromContext(ctx).Warn("GoCollector is already registered")
 		}
 	}
@@ -117,21 +125,27 @@ func initStandardRegistry(config *types.Prometheus) Registry {
 		Name: configLastReloadFailureName,
 		Help: "Last config reload failure",
 	}, []string{})
+	tlsCertsNotAfterTimesptamp := newGaugeFrom(promState.collectors, stdprometheus.GaugeOpts{
+		Name: tlsCertsNotAfterTimestamp,
+		Help: "Certificate expiration timestamp",
+	}, []string{"cn", "serial", "sans"})
 
 	promState.describers = []func(chan<- *stdprometheus.Desc){
 		configReloads.cv.Describe,
 		configReloadsFailures.cv.Describe,
 		lastConfigReloadSuccess.gv.Describe,
 		lastConfigReloadFailure.gv.Describe,
+		tlsCertsNotAfterTimesptamp.gv.Describe,
 	}
 
 	reg := &standardRegistry{
-		epEnabled:                    config.AddEntryPointsLabels,
-		svcEnabled:                   config.AddServicesLabels,
-		configReloadsCounter:         configReloads,
-		configReloadsFailureCounter:  configReloadsFailures,
-		lastConfigReloadSuccessGauge: lastConfigReloadSuccess,
-		lastConfigReloadFailureGauge: lastConfigReloadFailure,
+		epEnabled:                      config.AddEntryPointsLabels,
+		svcEnabled:                     config.AddServicesLabels,
+		configReloadsCounter:           configReloads,
+		configReloadsFailureCounter:    configReloadsFailures,
+		lastConfigReloadSuccessGauge:   lastConfigReloadSuccess,
+		lastConfigReloadFailureGauge:   lastConfigReloadFailure,
+		tlsCertsNotAfterTimestampGauge: tlsCertsNotAfterTimesptamp,
 	}
 
 	if config.AddEntryPointsLabels {
@@ -159,11 +173,13 @@ func initStandardRegistry(config *types.Prometheus) Registry {
 			entryPointReqDurations.hv.Describe,
 			entryPointOpenConns.gv.Describe,
 		}...)
+
 		reg.entryPointReqsCounter = entryPointReqs
 		reg.entryPointReqsTLSCounter = entryPointReqsTLS
 		reg.entryPointReqDurationHistogram, _ = NewHistogramWithScale(entryPointReqDurations, time.Second)
 		reg.entryPointOpenConnsGauge = entryPointOpenConns
 	}
+
 	if config.AddServicesLabels {
 		serviceReqs := newCounterFrom(promState.collectors, stdprometheus.CounterOpts{
 			Name: serviceReqsTotalName,
@@ -212,15 +228,21 @@ func initStandardRegistry(config *types.Prometheus) Registry {
 }
 
 func registerPromState(ctx context.Context) bool {
-	if err := promRegistry.Register(promState); err != nil {
-		logger := log.FromContext(ctx)
-		if _, ok := err.(stdprometheus.AlreadyRegisteredError); !ok {
-			logger.Errorf("Unable to register Traefik to Prometheus: %v", err)
-			return false
-		}
-		logger.Debug("Prometheus collector already registered.")
+	err := promRegistry.Register(promState)
+	if err == nil {
+		return true
 	}
-	return true
+
+	logger := log.FromContext(ctx)
+
+	var arErr stdprometheus.AlreadyRegisteredError
+	if errors.As(err, &arErr) {
+		logger.Debug("Prometheus collector already registered.")
+		return true
+	}
+
+	logger.Errorf("Unable to register Traefik to Prometheus: %v", err)
+	return false
 }
 
 // OnConfigurationUpdate receives the current configuration from Traefik.
@@ -369,18 +391,18 @@ func (d *dynamicConfig) hasServerURL(serviceName, serverURL string) bool {
 	return false
 }
 
-func newCollector(metricName string, labels stdprometheus.Labels, c stdprometheus.Collector, delete func()) *collector {
+func newCollector(metricName string, labels stdprometheus.Labels, c stdprometheus.Collector, deleteFn func()) *collector {
 	return &collector{
 		id:        buildMetricID(metricName, labels),
 		labels:    labels,
 		collector: c,
-		delete:    delete,
+		delete:    deleteFn,
 	}
 }
 
 // collector wraps a Collector object from the Prometheus client library.
 // It adds information on how many generations this metric should be present
-// in the /metrics output, relatived to the time it was last tracked.
+// in the /metrics output, relative to the time it was last tracked.
 type collector struct {
 	id        string
 	labels    stdprometheus.Labels

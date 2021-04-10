@@ -5,15 +5,17 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 
-	"github.com/containous/traefik/v2/pkg/config/runtime"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/rules"
-	"github.com/containous/traefik/v2/pkg/server/provider"
-	tcpservice "github.com/containous/traefik/v2/pkg/server/service/tcp"
-	"github.com/containous/traefik/v2/pkg/tcp"
-	traefiktls "github.com/containous/traefik/v2/pkg/tls"
+	"github.com/traefik/traefik/v2/pkg/config/runtime"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/rules"
+	"github.com/traefik/traefik/v2/pkg/server/provider"
+	tcpservice "github.com/traefik/traefik/v2/pkg/server/service/tcp"
+	"github.com/traefik/traefik/v2/pkg/tcp"
+	traefiktls "github.com/traefik/traefik/v2/pkg/tls"
 )
 
 const (
@@ -99,21 +101,25 @@ func (m *Manager) buildEntryPointHandler(ctx context.Context, configs map[string
 		log.FromContext(ctx).Errorf("Error during the build of the default TLS configuration: %v", err)
 	}
 
-	router.HTTPSHandler(handlerHTTPS, defaultTLSConf)
-
 	if len(configsHTTP) > 0 {
 		router.AddRouteHTTPTLS("*", defaultTLSConf)
 	}
 
 	// Keyed by domain, then by options reference.
 	tlsOptionsForHostSNI := map[string]map[string]nameAndConfig{}
+	tlsOptionsForHost := map[string]string{}
 	for routerHTTPName, routerHTTPConfig := range configsHTTP {
-		if len(routerHTTPConfig.TLS.Options) == 0 || routerHTTPConfig.TLS.Options == defaultTLSConfigName {
+		if routerHTTPConfig.TLS == nil {
 			continue
 		}
 
 		ctxRouter := log.With(provider.AddInContext(ctx, routerHTTPName), log.Str(log.RouterName, routerHTTPName))
 		logger := log.FromContext(ctxRouter)
+
+		tlsOptionsName := defaultTLSConfigName
+		if len(routerHTTPConfig.TLS.Options) > 0 && routerHTTPConfig.TLS.Options != defaultTLSConfigName {
+			tlsOptionsName = provider.GetQualifiedName(ctxRouter, routerHTTPConfig.TLS.Options)
+		}
 
 		domains, err := rules.ParseDomains(routerHTTPConfig.Rule)
 		if err != nil {
@@ -128,29 +134,65 @@ func (m *Manager) buildEntryPointHandler(ctx context.Context, configs map[string
 		}
 
 		for _, domain := range domains {
-			if routerHTTPConfig.TLS != nil {
-				tlsOptionsName := routerHTTPConfig.TLS.Options
-				if tlsOptionsName != defaultTLSConfigName {
-					tlsOptionsName = provider.GetQualifiedName(ctxRouter, routerHTTPConfig.TLS.Options)
-				}
+			tlsConf, err := m.tlsManager.Get(defaultTLSStoreName, tlsOptionsName)
+			if err != nil {
+				routerHTTPConfig.AddError(err, true)
+				logger.Debug(err)
+				continue
+			}
 
-				tlsConf, err := m.tlsManager.Get(defaultTLSStoreName, tlsOptionsName)
-				if err != nil {
-					routerHTTPConfig.AddError(err, true)
-					logger.Debug(err)
-					continue
-				}
+			// domain is already in lower case thanks to the domain parsing
+			if tlsOptionsForHostSNI[domain] == nil {
+				tlsOptionsForHostSNI[domain] = make(map[string]nameAndConfig)
+			}
+			tlsOptionsForHostSNI[domain][tlsOptionsName] = nameAndConfig{
+				routerName: routerHTTPName,
+				TLSConfig:  tlsConf,
+			}
 
-				if tlsOptionsForHostSNI[domain] == nil {
-					tlsOptionsForHostSNI[domain] = make(map[string]nameAndConfig)
-				}
-				tlsOptionsForHostSNI[domain][routerHTTPConfig.TLS.Options] = nameAndConfig{
-					routerName: routerHTTPName,
-					TLSConfig:  tlsConf,
-				}
+			if name, ok := tlsOptionsForHost[domain]; ok && name != tlsOptionsName {
+				// Different tlsOptions on the same domain fallback to default
+				tlsOptionsForHost[domain] = defaultTLSConfigName
+			} else {
+				tlsOptionsForHost[domain] = tlsOptionsName
 			}
 		}
 	}
+
+	sniCheck := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.TLS == nil {
+			handlerHTTPS.ServeHTTP(rw, req)
+			return
+		}
+
+		host, _, err := net.SplitHostPort(req.Host)
+		if err != nil {
+			host = req.Host
+		}
+
+		host = strings.TrimSpace(host)
+		serverName := strings.TrimSpace(req.TLS.ServerName)
+
+		// Domain Fronting
+		if !strings.EqualFold(host, serverName) {
+			tlsOptionSNI := findTLSOptionName(tlsOptionsForHost, serverName)
+			tlsOptionHeader := findTLSOptionName(tlsOptionsForHost, host)
+
+			if tlsOptionHeader != tlsOptionSNI {
+				log.WithoutContext().
+					WithField("host", host).
+					WithField("req.Host", req.Host).
+					WithField("req.TLS.ServerName", req.TLS.ServerName).
+					Debugf("TLS options difference: SNI=%s, Header:%s", tlsOptionSNI, tlsOptionHeader)
+				http.Error(rw, http.StatusText(http.StatusMisdirectedRequest), http.StatusMisdirectedRequest)
+				return
+			}
+		}
+
+		handlerHTTPS.ServeHTTP(rw, req)
+	})
+
+	router.HTTPSHandler(sniCheck, defaultTLSConf)
 
 	logger := log.FromContext(ctx)
 	for hostSNI, tlsConfigs := range tlsOptionsForHostSNI {
@@ -216,28 +258,36 @@ func (m *Manager) buildEntryPointHandler(ctx context.Context, configs map[string
 			logger.Debugf("Adding route %s on TCP", domain)
 			switch {
 			case routerConfig.TLS != nil:
+				if !rules.IsASCII(domain) {
+					asciiError := fmt.Errorf("invalid domain name value %q, non-ASCII characters are not allowed", domain)
+					routerConfig.AddError(asciiError, true)
+					logger.Debug(asciiError)
+					continue
+				}
+
 				if routerConfig.TLS.Passthrough {
 					router.AddRoute(domain, handler)
-				} else {
-					tlsOptionsName := routerConfig.TLS.Options
-
-					if len(tlsOptionsName) == 0 {
-						tlsOptionsName = defaultTLSConfigName
-					}
-
-					if tlsOptionsName != defaultTLSConfigName {
-						tlsOptionsName = provider.GetQualifiedName(ctxRouter, tlsOptionsName)
-					}
-
-					tlsConf, err := m.tlsManager.Get(defaultTLSStoreName, tlsOptionsName)
-					if err != nil {
-						routerConfig.AddError(err, true)
-						logger.Debug(err)
-						continue
-					}
-
-					router.AddRouteTLS(domain, handler, tlsConf)
+					continue
 				}
+
+				tlsOptionsName := routerConfig.TLS.Options
+
+				if len(tlsOptionsName) == 0 {
+					tlsOptionsName = defaultTLSConfigName
+				}
+
+				if tlsOptionsName != defaultTLSConfigName {
+					tlsOptionsName = provider.GetQualifiedName(ctxRouter, tlsOptionsName)
+				}
+
+				tlsConf, err := m.tlsManager.Get(defaultTLSStoreName, tlsOptionsName)
+				if err != nil {
+					routerConfig.AddError(err, true)
+					logger.Debug(err)
+					continue
+				}
+
+				router.AddRouteTLS(domain, handler, tlsConf)
 			case domain == "*":
 				router.AddCatchAllNoTLS(handler)
 			default:
@@ -247,4 +297,18 @@ func (m *Manager) buildEntryPointHandler(ctx context.Context, configs map[string
 	}
 
 	return router, nil
+}
+
+func findTLSOptionName(tlsOptionsForHost map[string]string, host string) string {
+	tlsOptions, ok := tlsOptionsForHost[host]
+	if ok {
+		return tlsOptions
+	}
+
+	tlsOptions, ok = tlsOptionsForHost[strings.ToLower(host)]
+	if ok {
+		return tlsOptions
+	}
+
+	return defaultTLSConfigName
 }

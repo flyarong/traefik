@@ -4,13 +4,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
 
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/tls/generate"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/tls/generate"
 )
 
 var (
@@ -56,6 +55,23 @@ type Certificate struct {
 // Certs and Keys could be either a file path, or the file content itself.
 type Certificates []Certificate
 
+// GetCertificates retrieves the certificates as slice of tls.Certificate.
+func (c Certificates) GetCertificates() []tls.Certificate {
+	var certs []tls.Certificate
+
+	for _, certificate := range c {
+		cert, err := certificate.GetCertificate()
+		if err != nil {
+			log.WithoutContext().Debugf("Error while getting certificate: %v", err)
+			continue
+		}
+
+		certs = append(certs, cert)
+	}
+
+	return certs
+}
+
 // FileOrContent hold a file path or content.
 type FileOrContent string
 
@@ -73,7 +89,7 @@ func (f FileOrContent) Read() ([]byte, error) {
 	var content []byte
 	if f.IsPath() {
 		var err error
-		content, err = ioutil.ReadFile(f.String())
+		content, err = os.ReadFile(f.String())
 		if err != nil {
 			return nil, err
 		}
@@ -188,6 +204,26 @@ func (c *Certificate) AppendCertificate(certs map[string]map[string]*tls.Certifi
 	}
 
 	return err
+}
+
+// GetCertificate retrieves Certificate as tls.Certificate.
+func (c *Certificate) GetCertificate() (tls.Certificate, error) {
+	certContent, err := c.CertFile.Read()
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("unable to read CertFile : %w", err)
+	}
+
+	keyContent, err := c.KeyFile.Read()
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("unable to read KeyFile : %w", err)
+	}
+
+	cert, err := tls.X509KeyPair(certContent, keyContent)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("unable to generate TLS certificate : %w", err)
+	}
+
+	return cert, nil
 }
 
 // GetTruncatedCertificateName truncates the certificate name.

@@ -2,25 +2,26 @@ package api
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/config/runtime"
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/provider/docker"
-	"github.com/containous/traefik/v2/pkg/provider/file"
-	"github.com/containous/traefik/v2/pkg/provider/kubernetes/crd"
-	"github.com/containous/traefik/v2/pkg/provider/kubernetes/ingress"
-	"github.com/containous/traefik/v2/pkg/provider/marathon"
-	"github.com/containous/traefik/v2/pkg/provider/rancher"
-	"github.com/containous/traefik/v2/pkg/provider/rest"
-	"github.com/containous/traefik/v2/pkg/tracing/jaeger"
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/config/runtime"
+	"github.com/traefik/traefik/v2/pkg/config/static"
+	"github.com/traefik/traefik/v2/pkg/provider/docker"
+	"github.com/traefik/traefik/v2/pkg/provider/file"
+	"github.com/traefik/traefik/v2/pkg/provider/kubernetes/crd"
+	"github.com/traefik/traefik/v2/pkg/provider/kubernetes/ingress"
+	"github.com/traefik/traefik/v2/pkg/provider/marathon"
+	"github.com/traefik/traefik/v2/pkg/provider/rancher"
+	"github.com/traefik/traefik/v2/pkg/provider/rest"
+	"github.com/traefik/traefik/v2/pkg/tracing/jaeger"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 func TestHandler_Overview(t *testing.T) {
@@ -263,7 +264,7 @@ func TestHandler_Overview(t *testing.T) {
 			}
 
 			assert.Equal(t, resp.Header.Get("Content-Type"), "application/json")
-			contents, err := ioutil.ReadAll(resp.Body)
+			contents, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
 			err = resp.Body.Close()
@@ -277,11 +278,11 @@ func TestHandler_Overview(t *testing.T) {
 				newJSON, err := json.MarshalIndent(results, "", "\t")
 				require.NoError(t, err)
 
-				err = ioutil.WriteFile(test.expected.jsonFile, newJSON, 0o644)
+				err = os.WriteFile(test.expected.jsonFile, newJSON, 0o644)
 				require.NoError(t, err)
 			}
 
-			data, err := ioutil.ReadFile(test.expected.jsonFile)
+			data, err := os.ReadFile(test.expected.jsonFile)
 			require.NoError(t, err)
 			assert.JSONEq(t, string(data), string(contents))
 		})

@@ -2,12 +2,13 @@ package wrr
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/log"
 )
 
 type namedHandler struct {
@@ -21,6 +22,19 @@ type stickyCookie struct {
 	name     string
 	secure   bool
 	httpOnly bool
+}
+
+// Balancer is a WeightedRoundRobin load balancer based on Earliest Deadline First (EDF).
+// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling)
+// Each pick from the schedule has the earliest deadline entry selected.
+// Entries have deadlines set at currentDeadline + 1 / weight,
+// providing weighted round robin behavior with floating point weights and an O(log n) pick time.
+type Balancer struct {
+	stickyCookie *stickyCookie
+
+	mutex       sync.RWMutex
+	handlers    []*namedHandler
+	curDeadline float64
 }
 
 // New creates a new load balancer.
@@ -67,19 +81,6 @@ func (b *Balancer) Pop() interface{} {
 	return h
 }
 
-// Balancer is a WeightedRoundRobin load balancer based on Earliest Deadline First (EDF).
-// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling)
-// Each pick from the schedule has the earliest deadline entry selected.
-// Entries have deadlines set at currentDeadline + 1 / weight,
-// providing weighted round robin behavior with floating point weights and an O(log n) pick time.
-type Balancer struct {
-	stickyCookie *stickyCookie
-
-	mutex       sync.RWMutex
-	handlers    []*namedHandler
-	curDeadline float64
-}
-
 func (b *Balancer) nextServer() (*namedHandler, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -105,7 +106,7 @@ func (b *Balancer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if b.stickyCookie != nil {
 		cookie, err := req.Cookie(b.stickyCookie.name)
 
-		if err != nil && err != http.ErrNoCookie {
+		if err != nil && !errors.Is(err, http.ErrNoCookie) {
 			log.WithoutContext().Warnf("Error while reading cookie: %v", err)
 		}
 

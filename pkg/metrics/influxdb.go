@@ -8,12 +8,12 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/types"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/influx"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 var influxDBClient *influx.Influx
@@ -26,18 +26,19 @@ type influxDBWriter struct {
 var influxDBTicker *time.Ticker
 
 const (
-	influxDBMetricsServiceReqsName      = "traefik.service.requests.total"
-	influxDBMetricsServiceLatencyName   = "traefik.service.request.duration"
-	influxDBRetriesTotalName            = "traefik.service.retries.total"
-	influxDBConfigReloadsName           = "traefik.config.reload.total"
-	influxDBConfigReloadsFailureName    = influxDBConfigReloadsName + ".failure"
-	influxDBLastConfigReloadSuccessName = "traefik.config.reload.lastSuccessTimestamp"
-	influxDBLastConfigReloadFailureName = "traefik.config.reload.lastFailureTimestamp"
-	influxDBEntryPointReqsName          = "traefik.entrypoint.requests.total"
-	influxDBEntryPointReqDurationName   = "traefik.entrypoint.request.duration"
-	influxDBEntryPointOpenConnsName     = "traefik.entrypoint.connections.open"
-	influxDBOpenConnsName               = "traefik.service.connections.open"
-	influxDBServerUpName                = "traefik.service.server.up"
+	influxDBMetricsServiceReqsName        = "traefik.service.requests.total"
+	influxDBMetricsServiceLatencyName     = "traefik.service.request.duration"
+	influxDBRetriesTotalName              = "traefik.service.retries.total"
+	influxDBConfigReloadsName             = "traefik.config.reload.total"
+	influxDBConfigReloadsFailureName      = influxDBConfigReloadsName + ".failure"
+	influxDBLastConfigReloadSuccessName   = "traefik.config.reload.lastSuccessTimestamp"
+	influxDBLastConfigReloadFailureName   = "traefik.config.reload.lastFailureTimestamp"
+	influxDBEntryPointReqsName            = "traefik.entrypoint.requests.total"
+	influxDBEntryPointReqDurationName     = "traefik.entrypoint.request.duration"
+	influxDBEntryPointOpenConnsName       = "traefik.entrypoint.connections.open"
+	influxDBOpenConnsName                 = "traefik.service.connections.open"
+	influxDBServerUpName                  = "traefik.service.server.up"
+	influxDBTLSCertsNotAfterTimestampName = "traefik.tls.certs.notAfterTimestamp"
 )
 
 const (
@@ -55,10 +56,11 @@ func RegisterInfluxDB(ctx context.Context, config *types.InfluxDB) Registry {
 	}
 
 	registry := &standardRegistry{
-		configReloadsCounter:         influxDBClient.NewCounter(influxDBConfigReloadsName),
-		configReloadsFailureCounter:  influxDBClient.NewCounter(influxDBConfigReloadsFailureName),
-		lastConfigReloadSuccessGauge: influxDBClient.NewGauge(influxDBLastConfigReloadSuccessName),
-		lastConfigReloadFailureGauge: influxDBClient.NewGauge(influxDBLastConfigReloadFailureName),
+		configReloadsCounter:           influxDBClient.NewCounter(influxDBConfigReloadsName),
+		configReloadsFailureCounter:    influxDBClient.NewCounter(influxDBConfigReloadsFailureName),
+		lastConfigReloadSuccessGauge:   influxDBClient.NewGauge(influxDBLastConfigReloadSuccessName),
+		lastConfigReloadFailureGauge:   influxDBClient.NewGauge(influxDBLastConfigReloadFailureName),
+		tlsCertsNotAfterTimestampGauge: influxDBClient.NewGauge(influxDBTLSCertsNotAfterTimestampName),
 	}
 
 	if config.AddEntryPointsLabels {

@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	tracingMiddleware "github.com/containous/traefik/v2/pkg/middlewares/tracing"
-	"github.com/containous/traefik/v2/pkg/testhelpers"
-	"github.com/containous/traefik/v2/pkg/tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/mocktracer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	tracingMiddleware "github.com/traefik/traefik/v2/pkg/middlewares/tracing"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
+	"github.com/traefik/traefik/v2/pkg/tracing"
 	"github.com/vulcand/oxy/forward"
 )
 
@@ -26,9 +25,10 @@ func TestForwardAuthFail(t *testing.T) {
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(forward.ProxyAuthenticate, "test")
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	middleware, err := NewForward(context.Background(), next, dynamic.ForwardAuth{
 		Address: server.URL,
@@ -36,18 +36,19 @@ func TestForwardAuthFail(t *testing.T) {
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(middleware)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	req := testhelpers.MustNewRequest(http.MethodGet, ts.URL, nil)
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusForbidden, res.StatusCode)
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	err = res.Body.Close()
 	require.NoError(t, err)
 
+	assert.Equal(t, "test", res.Header.Get(forward.ProxyAuthenticate))
 	assert.Equal(t, "Forbidden\n", string(body))
 }
 
@@ -57,34 +58,40 @@ func TestForwardAuthSuccess(t *testing.T) {
 		w.Header().Set("X-Auth-Secret", "secret")
 		w.Header().Add("X-Auth-Group", "group1")
 		w.Header().Add("X-Auth-Group", "group2")
+		w.Header().Add("Foo-Bar", "auth-value")
 		fmt.Fprintln(w, "Success")
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "user@example.com", r.Header.Get("X-Auth-User"))
 		assert.Empty(t, r.Header.Get("X-Auth-Secret"))
 		assert.Equal(t, []string{"group1", "group2"}, r.Header["X-Auth-Group"])
+		assert.Equal(t, "auth-value", r.Header.Get("Foo-Bar"))
+		assert.Empty(t, r.Header.Get("Foo-Baz"))
 		fmt.Fprintln(w, "traefik")
 	})
 
 	auth := dynamic.ForwardAuth{
-		Address:             server.URL,
-		AuthResponseHeaders: []string{"X-Auth-User", "X-Auth-Group"},
+		Address:                  server.URL,
+		AuthResponseHeaders:      []string{"X-Auth-User", "X-Auth-Group"},
+		AuthResponseHeadersRegex: "^Foo-",
 	}
 	middleware, err := NewForward(context.Background(), next, auth, "authTest")
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(middleware)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	req := testhelpers.MustNewRequest(http.MethodGet, ts.URL, nil)
 	req.Header.Set("X-Auth-Group", "admin_group")
+	req.Header.Set("Foo-Bar", "client-value")
+	req.Header.Set("Foo-Baz", "client-value")
 	res, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	err = res.Body.Close()
 	require.NoError(t, err)
@@ -95,20 +102,19 @@ func TestForwardAuthRedirect(t *testing.T) {
 	authTs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "http://example.com/redirect-test", http.StatusFound)
 	}))
-	defer authTs.Close()
+	t.Cleanup(authTs.Close)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "traefik")
 	})
 
-	auth := dynamic.ForwardAuth{
-		Address: authTs.URL,
-	}
+	auth := dynamic.ForwardAuth{Address: authTs.URL}
+
 	authMiddleware, err := NewForward(context.Background(), next, auth, "authTest")
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(authMiddleware)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	client := &http.Client{
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
@@ -127,7 +133,7 @@ func TestForwardAuthRedirect(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "http://example.com/redirect-test", location.String())
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	err = res.Body.Close()
 	require.NoError(t, err)
@@ -137,9 +143,9 @@ func TestForwardAuthRedirect(t *testing.T) {
 func TestForwardAuthRemoveHopByHopHeaders(t *testing.T) {
 	authTs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers := w.Header()
-		for _, header := range forward.HopHeaders {
+		for _, header := range hopHeaders {
 			if header == forward.TransferEncoding {
-				headers.Add(header, "identity")
+				headers.Set(header, "chunked")
 			} else {
 				headers.Add(header, "test")
 			}
@@ -147,29 +153,29 @@ func TestForwardAuthRemoveHopByHopHeaders(t *testing.T) {
 
 		http.Redirect(w, r, "http://example.com/redirect-test", http.StatusFound)
 	}))
-	defer authTs.Close()
+	t.Cleanup(authTs.Close)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "traefik")
 	})
-	auth := dynamic.ForwardAuth{
-		Address: authTs.URL,
-	}
-	authMiddleware, err := NewForward(context.Background(), next, auth, "authTest")
 
-	assert.NoError(t, err, "there should be no error")
+	auth := dynamic.ForwardAuth{Address: authTs.URL}
+
+	authMiddleware, err := NewForward(context.Background(), next, auth, "authTest")
+	require.NoError(t, err)
 
 	ts := httptest.NewServer(authMiddleware)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	client := &http.Client{
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
+
 	req := testhelpers.MustNewRequest(http.MethodGet, ts.URL, nil)
 	res, err := client.Do(req)
-	assert.NoError(t, err, "there should be no error")
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, res.StatusCode, "they should be equal")
 
 	for _, header := range forward.HopHeaders {
@@ -177,11 +183,11 @@ func TestForwardAuthRemoveHopByHopHeaders(t *testing.T) {
 	}
 
 	location, err := res.Location()
-	assert.NoError(t, err, "there should be no error")
+	require.NoError(t, err)
 	assert.Equal(t, "http://example.com/redirect-test", location.String(), "they should be equal")
 
-	body, err := ioutil.ReadAll(res.Body)
-	assert.NoError(t, err, "there should be no error")
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
 	assert.NotEmpty(t, string(body), "there should be something in the body")
 }
 
@@ -192,7 +198,7 @@ func TestForwardAuthFailResponseHeaders(t *testing.T) {
 		w.Header().Add("X-Foo", "bar")
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	}))
-	defer authTs.Close()
+	t.Cleanup(authTs.Close)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "traefik")
@@ -205,7 +211,7 @@ func TestForwardAuthFailResponseHeaders(t *testing.T) {
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(authMiddleware)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	req := testhelpers.MustNewRequest(http.MethodGet, ts.URL, nil)
 
@@ -231,7 +237,7 @@ func TestForwardAuthFailResponseHeaders(t *testing.T) {
 		assert.Equal(t, value, res.Header[key])
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	err = res.Body.Close()
 	require.NoError(t, err)
@@ -243,6 +249,7 @@ func Test_writeHeader(t *testing.T) {
 	testCases := []struct {
 		name                      string
 		headers                   map[string]string
+		authRequestHeaders        []string
 		trustForwardHeader        bool
 		emptyHost                 bool
 		expectedHeaders           map[string]string
@@ -361,6 +368,47 @@ func Test_writeHeader(t *testing.T) {
 			},
 			trustForwardHeader: false,
 			expectedHeaders: map[string]string{
+				"X-CustomHeader":           "CustomHeader",
+				"X-Forwarded-Proto":        "http",
+				"X-Forwarded-Host":         "foo.bar",
+				"X-Forwarded-Uri":          "/path?q=1",
+				"X-Forwarded-Method":       "GET",
+				forward.ProxyAuthenticate:  "ProxyAuthenticate",
+				forward.ProxyAuthorization: "ProxyAuthorization",
+			},
+			checkForUnexpectedHeaders: true,
+		},
+		{
+			name: "filter forward request headers",
+			headers: map[string]string{
+				"X-CustomHeader": "CustomHeader",
+				"Content-Type":   "multipart/form-data; boundary=---123456",
+			},
+			authRequestHeaders: []string{
+				"X-CustomHeader",
+			},
+			trustForwardHeader: false,
+			expectedHeaders: map[string]string{
+				"x-customHeader":     "CustomHeader",
+				"X-Forwarded-Proto":  "http",
+				"X-Forwarded-Host":   "foo.bar",
+				"X-Forwarded-Uri":    "/path?q=1",
+				"X-Forwarded-Method": "GET",
+			},
+			checkForUnexpectedHeaders: true,
+		},
+		{
+			name: "filter forward request headers doesn't add new headers",
+			headers: map[string]string{
+				"X-CustomHeader": "CustomHeader",
+				"Content-Type":   "multipart/form-data; boundary=---123456",
+			},
+			authRequestHeaders: []string{
+				"X-CustomHeader",
+				"X-Non-Exists-Header",
+			},
+			trustForwardHeader: false,
+			expectedHeaders: map[string]string{
 				"X-CustomHeader":     "CustomHeader",
 				"X-Forwarded-Proto":  "http",
 				"X-Forwarded-Host":   "foo.bar",
@@ -384,9 +432,10 @@ func Test_writeHeader(t *testing.T) {
 
 			forwardReq := testhelpers.MustNewRequest(http.MethodGet, "http://foo.bar/path?q=1", nil)
 
-			writeHeader(req, forwardReq, test.trustForwardHeader)
+			writeHeader(req, forwardReq, test.trustForwardHeader, test.authRequestHeaders)
 
 			actualHeaders := forwardReq.Header
+
 			expectedHeaders := test.expectedHeaders
 			for key, value := range expectedHeaders {
 				assert.Equal(t, value, actualHeaders.Get(key))
@@ -407,7 +456,7 @@ func TestForwardAuthUsesTracing(t *testing.T) {
 			t.Errorf("expected Mockpfx-Ids-Traceid header to be present in request")
 		}
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	next := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
@@ -426,7 +475,7 @@ func TestForwardAuthUsesTracing(t *testing.T) {
 	next = tracingMiddleware.NewEntryPoint(context.Background(), tr, "tracingTest", next)
 
 	ts := httptest.NewServer(next)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	req := testhelpers.MustNewRequest(http.MethodGet, ts.URL, nil)
 	res, err := http.DefaultClient.Do(req)
@@ -439,5 +488,5 @@ type mockBackend struct {
 }
 
 func (b *mockBackend) Setup(componentName string) (opentracing.Tracer, io.Closer, error) {
-	return b.Tracer, ioutil.NopCloser(nil), nil
+	return b.Tracer, io.NopCloser(nil), nil
 }

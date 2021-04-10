@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/types"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/statsd"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 var (
@@ -17,18 +17,19 @@ var (
 )
 
 const (
-	statsdMetricsServiceReqsName      = "service.request.total"
-	statsdMetricsServiceLatencyName   = "service.request.duration"
-	statsdRetriesTotalName            = "service.retries.total"
-	statsdConfigReloadsName           = "config.reload.total"
-	statsdConfigReloadsFailureName    = statsdConfigReloadsName + ".failure"
-	statsdLastConfigReloadSuccessName = "config.reload.lastSuccessTimestamp"
-	statsdLastConfigReloadFailureName = "config.reload.lastFailureTimestamp"
-	statsdEntryPointReqsName          = "entrypoint.request.total"
-	statsdEntryPointReqDurationName   = "entrypoint.request.duration"
-	statsdEntryPointOpenConnsName     = "entrypoint.connections.open"
-	statsdOpenConnsName               = "service.connections.open"
-	statsdServerUpName                = "service.server.up"
+	statsdMetricsServiceReqsName        = "service.request.total"
+	statsdMetricsServiceLatencyName     = "service.request.duration"
+	statsdRetriesTotalName              = "service.retries.total"
+	statsdConfigReloadsName             = "config.reload.total"
+	statsdConfigReloadsFailureName      = statsdConfigReloadsName + ".failure"
+	statsdLastConfigReloadSuccessName   = "config.reload.lastSuccessTimestamp"
+	statsdLastConfigReloadFailureName   = "config.reload.lastFailureTimestamp"
+	statsdEntryPointReqsName            = "entrypoint.request.total"
+	statsdEntryPointReqDurationName     = "entrypoint.request.duration"
+	statsdEntryPointOpenConnsName       = "entrypoint.connections.open"
+	statsdOpenConnsName                 = "service.connections.open"
+	statsdServerUpName                  = "service.server.up"
+	statsdTLSCertsNotAfterTimestampName = "tls.certs.notAfterTimestamp"
 )
 
 // RegisterStatsd registers the metrics pusher if this didn't happen yet and creates a statsd Registry instance.
@@ -48,10 +49,11 @@ func RegisterStatsd(ctx context.Context, config *types.Statsd) Registry {
 	}
 
 	registry := &standardRegistry{
-		configReloadsCounter:         statsdClient.NewCounter(statsdConfigReloadsName, 1.0),
-		configReloadsFailureCounter:  statsdClient.NewCounter(statsdConfigReloadsFailureName, 1.0),
-		lastConfigReloadSuccessGauge: statsdClient.NewGauge(statsdLastConfigReloadSuccessName),
-		lastConfigReloadFailureGauge: statsdClient.NewGauge(statsdLastConfigReloadFailureName),
+		configReloadsCounter:           statsdClient.NewCounter(statsdConfigReloadsName, 1.0),
+		configReloadsFailureCounter:    statsdClient.NewCounter(statsdConfigReloadsFailureName, 1.0),
+		lastConfigReloadSuccessGauge:   statsdClient.NewGauge(statsdLastConfigReloadSuccessName),
+		lastConfigReloadFailureGauge:   statsdClient.NewGauge(statsdLastConfigReloadFailureName),
+		tlsCertsNotAfterTimestampGauge: statsdClient.NewGauge(statsdTLSCertsNotAfterTimestampName),
 	}
 
 	if config.AddEntryPointsLabels {

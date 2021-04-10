@@ -7,21 +7,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/types"
-	"github.com/containous/traefik/v2/pkg/udp"
 	"github.com/stretchr/testify/require"
+	ptypes "github.com/traefik/paerser/types"
+	"github.com/traefik/traefik/v2/pkg/config/static"
+	"github.com/traefik/traefik/v2/pkg/udp"
 )
 
 func TestShutdownUDPConn(t *testing.T) {
-	entryPoint, err := NewUDPEntryPoint(&static.EntryPoint{
+	ep := static.EntryPoint{
 		Address: ":0",
 		Transport: &static.EntryPointsTransport{
 			LifeCycle: &static.LifeCycle{
-				GraceTimeOut: types.Duration(5 * time.Second),
+				GraceTimeOut: ptypes.Duration(5 * time.Second),
 			},
 		},
-	})
+	}
+	ep.SetDefaults()
+
+	entryPoint, err := NewUDPEntryPoint(&ep)
 	require.NoError(t, err)
 
 	go entryPoint.Start(context.Background())
@@ -103,6 +106,8 @@ func TestShutdownUDPConn(t *testing.T) {
 // It fatals if the read blocks longer than timeout, which is useful to detect
 // regressions that would make a test wait forever.
 func requireEcho(t *testing.T, data string, conn io.ReadWriter, timeout time.Duration) {
+	t.Helper()
+
 	_, err := conn.Write([]byte(data))
 	require.NoError(t, err)
 

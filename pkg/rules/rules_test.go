@@ -5,11 +5,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/middlewares/requestdecorator"
-	"github.com/containous/traefik/v2/pkg/testhelpers"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/middlewares/requestdecorator"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
 )
 
 func Test_addRoute(t *testing.T) {
@@ -27,6 +27,16 @@ func Test_addRoute(t *testing.T) {
 		{
 			desc:          "Rule with no matcher",
 			rule:          "rulewithnotmatcher",
+			expectedError: true,
+		},
+		{
+			desc:          "Host empty",
+			rule:          "Host(``)",
+			expectedError: true,
+		},
+		{
+			desc:          "PathPrefix empty",
+			rule:          "PathPrefix(``)",
 			expectedError: true,
 		},
 		{
@@ -49,6 +59,16 @@ func Test_addRoute(t *testing.T) {
 			expected: map[string]int{
 				"http://localhost/foo": http.StatusOK,
 			},
+		},
+		{
+			desc:          "Non-ASCII Host",
+			rule:          "Host(`locàlhost`)",
+			expectedError: true,
+		},
+		{
+			desc:          "Non-ASCII HostRegexp",
+			rule:          "HostRegexp(`locàlhost`)",
+			expectedError: true,
 		},
 		{
 			desc: "HostHeader equivalent to Host",

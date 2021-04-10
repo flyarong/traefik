@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/abronan/valkeyrie/store"
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/tls"
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	ptypes "github.com/traefik/paerser/types"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/tls"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 func Test_buildConfiguration(t *testing.T) {
@@ -70,6 +71,8 @@ func Test_buildConfiguration(t *testing.T) {
 		"traefik/http/services/Service03/weighted/services/1/weight":                                 "42",
 		"traefik/http/middlewares/Middleware08/forwardAuth/authResponseHeaders/0":                    "foobar",
 		"traefik/http/middlewares/Middleware08/forwardAuth/authResponseHeaders/1":                    "foobar",
+		"traefik/http/middlewares/Middleware08/forwardAuth/authRequestHeaders/0":                     "foobar",
+		"traefik/http/middlewares/Middleware08/forwardAuth/authRequestHeaders/1":                     "foobar",
 		"traefik/http/middlewares/Middleware08/forwardAuth/tls/key":                                  "foobar",
 		"traefik/http/middlewares/Middleware08/forwardAuth/tls/insecureSkipVerify":                   "true",
 		"traefik/http/middlewares/Middleware08/forwardAuth/tls/ca":                                   "foobar",
@@ -97,6 +100,8 @@ func Test_buildConfiguration(t *testing.T) {
 		"traefik/http/middlewares/Middleware09/headers/accessControlAllowOrigin":                     "foobar",
 		"traefik/http/middlewares/Middleware09/headers/accessControlAllowOriginList/0":               "foobar",
 		"traefik/http/middlewares/Middleware09/headers/accessControlAllowOriginList/1":               "foobar",
+		"traefik/http/middlewares/Middleware09/headers/accessControlAllowOriginListRegex/0":          "foobar",
+		"traefik/http/middlewares/Middleware09/headers/accessControlAllowOriginListRegex/1":          "foobar",
 		"traefik/http/middlewares/Middleware09/headers/contentTypeNosniff":                           "true",
 		"traefik/http/middlewares/Middleware09/headers/accessControlAllowCredentials":                "true",
 		"traefik/http/middlewares/Middleware09/headers/featurePolicy":                                "foobar",
@@ -346,7 +351,7 @@ func Test_buildConfiguration(t *testing.T) {
 					RateLimit: &dynamic.RateLimit{
 						Average: 42,
 						Burst:   42,
-						Period:  types.Duration(time.Second),
+						Period:  ptypes.Duration(time.Second),
 						SourceCriterion: &dynamic.SourceCriterion{
 							IPStrategy: &dynamic.IPStrategy{
 								Depth: 42,
@@ -403,6 +408,10 @@ func Test_buildConfiguration(t *testing.T) {
 						},
 						TrustForwardHeader: true,
 						AuthResponseHeaders: []string{
+							"foobar",
+							"foobar",
+						},
+						AuthRequestHeaders: []string{
 							"foobar",
 							"foobar",
 						},
@@ -547,6 +556,10 @@ func Test_buildConfiguration(t *testing.T) {
 						},
 						AccessControlAllowOrigin: "foobar",
 						AccessControlAllowOriginList: []string{
+							"foobar",
+							"foobar",
+						},
+						AccessControlAllowOriginListRegex: []string{
 							"foobar",
 							"foobar",
 						},

@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/middlewares"
-	"github.com/containous/traefik/v2/pkg/tracing"
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/middlewares"
+	"github.com/traefik/traefik/v2/pkg/tracing"
+	"github.com/traefik/traefik/v2/pkg/types"
 	"github.com/vulcand/oxy/utils"
 )
 
@@ -33,7 +33,7 @@ const (
 )
 
 type serviceBuilder interface {
-	BuildHTTP(ctx context.Context, serviceName string, responseModifier func(*http.Response) error) (http.Handler, error)
+	BuildHTTP(ctx context.Context, serviceName string) (http.Handler, error)
 }
 
 // customErrors is a middleware that provides the custom error pages..
@@ -54,7 +54,7 @@ func New(ctx context.Context, next http.Handler, config dynamic.ErrorPage, servi
 		return nil, err
 	}
 
-	backend, err := serviceBuilder.BuildHTTP(ctx, config.Service, nil)
+	backend, err := serviceBuilder.BuildHTTP(ctx, config.Service)
 	if err != nil {
 		return nil, err
 	}
@@ -92,39 +92,42 @@ func (c *customErrors) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// check the recorder code against the configured http status code ranges
 	code := catcher.getCode()
 	for _, block := range c.httpCodeRanges {
-		if code >= block[0] && code <= block[1] {
-			logger.Errorf("Caught HTTP Status Code %d, returning error page", code)
+		if code < block[0] || code > block[1] {
+			continue
+		}
 
-			var query string
-			if len(c.backendQuery) > 0 {
-				query = "/" + strings.TrimPrefix(c.backendQuery, "/")
-				query = strings.Replace(query, "{status}", strconv.Itoa(code), -1)
-			}
+		logger.Debugf("Caught HTTP Status Code %d, returning error page", code)
 
-			pageReq, err := newRequest(backendURL + query)
-			if err != nil {
-				logger.Error(err)
-				rw.WriteHeader(code)
-				_, err = fmt.Fprint(rw, http.StatusText(code))
-				if err != nil {
-					http.Error(rw, err.Error(), http.StatusInternalServerError)
-				}
-				return
-			}
+		var query string
+		if len(c.backendQuery) > 0 {
+			query = "/" + strings.TrimPrefix(c.backendQuery, "/")
+			query = strings.ReplaceAll(query, "{status}", strconv.Itoa(code))
+		}
 
-			recorderErrorPage := newResponseRecorder(ctx, rw)
-			utils.CopyHeaders(pageReq.Header, req.Header)
-
-			c.backendHandler.ServeHTTP(recorderErrorPage, pageReq.WithContext(req.Context()))
-
-			utils.CopyHeaders(rw.Header(), recorderErrorPage.Header())
+		pageReq, err := newRequest(backendURL + query)
+		if err != nil {
+			logger.Error(err)
 			rw.WriteHeader(code)
-
-			if _, err = rw.Write(recorderErrorPage.GetBody().Bytes()); err != nil {
-				logger.Error(err)
+			_, err = fmt.Fprint(rw, http.StatusText(code))
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
 			}
 			return
 		}
+
+		recorderErrorPage := newResponseRecorder(ctx, rw)
+		utils.CopyHeaders(pageReq.Header, req.Header)
+
+		c.backendHandler.ServeHTTP(recorderErrorPage, pageReq.WithContext(req.Context()))
+
+		utils.CopyHeaders(rw.Header(), recorderErrorPage.Header())
+		rw.WriteHeader(code)
+
+		if _, err = rw.Write(recorderErrorPage.GetBody().Bytes()); err != nil {
+			logger.Error(err)
+		}
+
+		return
 	}
 }
 

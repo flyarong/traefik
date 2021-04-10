@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/containous/traefik/v2/integration/try"
 	"github.com/go-check/check"
+	"github.com/traefik/traefik/v2/integration/try"
 	checker "github.com/vdemeester/shakers"
 )
 
@@ -32,9 +32,9 @@ func (s *ProxyProtocolSuite) TestProxyProtocolTrusted(c *check.C) {
 	defer display(c)
 	err := cmd.Start()
 	c.Assert(err, checker.IsNil)
-	defer cmd.Process.Kill()
+	defer s.killCmd(cmd)
 
-	err = try.GetRequest("http://"+haproxyIP+"/whoami", 500*time.Millisecond,
+	err = try.GetRequest("http://"+haproxyIP+"/whoami", 1*time.Second,
 		try.StatusCodeIs(http.StatusOK),
 		try.BodyContains("X-Forwarded-For: "+gatewayIP))
 	c.Assert(err, checker.IsNil)
@@ -55,9 +55,9 @@ func (s *ProxyProtocolSuite) TestProxyProtocolV2Trusted(c *check.C) {
 	defer display(c)
 	err := cmd.Start()
 	c.Assert(err, checker.IsNil)
-	defer cmd.Process.Kill()
+	defer s.killCmd(cmd)
 
-	err = try.GetRequest("http://"+haproxyIP+":81/whoami", 500*time.Millisecond,
+	err = try.GetRequest("http://"+haproxyIP+":81/whoami", 1*time.Second,
 		try.StatusCodeIs(http.StatusOK),
 		try.BodyContains("X-Forwarded-For: "+gatewayIP))
 	c.Assert(err, checker.IsNil)
@@ -77,9 +77,9 @@ func (s *ProxyProtocolSuite) TestProxyProtocolNotTrusted(c *check.C) {
 	defer display(c)
 	err := cmd.Start()
 	c.Assert(err, checker.IsNil)
-	defer cmd.Process.Kill()
+	defer s.killCmd(cmd)
 
-	err = try.GetRequest("http://"+haproxyIP+"/whoami", 500*time.Millisecond,
+	err = try.GetRequest("http://"+haproxyIP+"/whoami", 1*time.Second,
 		try.StatusCodeIs(http.StatusOK),
 		try.BodyContains("X-Forwarded-For: "+haproxyIP))
 	c.Assert(err, checker.IsNil)
@@ -99,9 +99,9 @@ func (s *ProxyProtocolSuite) TestProxyProtocolV2NotTrusted(c *check.C) {
 	defer display(c)
 	err := cmd.Start()
 	c.Assert(err, checker.IsNil)
-	defer cmd.Process.Kill()
+	defer s.killCmd(cmd)
 
-	err = try.GetRequest("http://"+haproxyIP+":81/whoami", 500*time.Millisecond,
+	err = try.GetRequest("http://"+haproxyIP+":81/whoami", 1*time.Second,
 		try.StatusCodeIs(http.StatusOK),
 		try.BodyContains("X-Forwarded-For: "+haproxyIP))
 	c.Assert(err, checker.IsNil)

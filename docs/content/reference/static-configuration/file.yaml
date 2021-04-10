@@ -32,6 +32,9 @@ entryPoints:
       trustedIPs:
       - foobar
       - foobar
+    enableHTTP3: true
+    udp:
+      timeout: 42
     http:
       redirections:
         entryPoint:
@@ -72,6 +75,7 @@ providers:
     swarmMode: true
     network: foobar
     swarmModeRefreshSeconds: 42
+    httpClientTimeout: 42
   file:
     directory: foobar
     watch: true
@@ -104,7 +108,6 @@ providers:
     endpoint: foobar
     token: foobar
     certAuthFilePath: foobar
-    disablePassHostHeaders: true
     namespaces:
     - foobar
     - foobar
@@ -119,12 +122,21 @@ providers:
     endpoint: foobar
     token: foobar
     certAuthFilePath: foobar
-    disablePassHostHeaders: true
+    namespaces:
+    - foobar
+    - foobar
+    allowCrossNamespace: true
+    labelSelector: foobar
+    ingressClass: foobar
+    throttleDuration: 42s
+  kubernetesGateway:
+    endpoint: foobar
+    token: foobar
+    certAuthFilePath: foobar
     namespaces:
     - foobar
     - foobar
     labelSelector: foobar
-    ingressClass: foobar
     throttleDuration: 42s
   rest:
     insecure: true
@@ -308,6 +320,7 @@ tracing:
     gen128Bit: true
     propagation: foobar
     traceContextHeaderName: foobar
+    disableAttemptReconnecting: true
     collector:
       endpoint: foobar
       user: foobar
@@ -351,8 +364,12 @@ certificatesResolvers:
     acme:
       email: foobar
       caServer: foobar
+      preferredChain: foobar
       storage: foobar
       keyType: foobar
+      eab:
+        kid: foobar
+        hmacEncoded: foobar
       dnsChallenge:
         provider: foobar
         delayBeforeCheck: 42
@@ -367,8 +384,12 @@ certificatesResolvers:
     acme:
       email: foobar
       caServer: foobar
+      preferredChain: foobar
       storage: foobar
       keyType: foobar
+      eab:
+        kid: foobar
+        hmacEncoded: foobar
       dnsChallenge:
         provider: foobar
         delayBeforeCheck: 42
@@ -379,9 +400,10 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: foobar
       tlsChallenge: {}
+pilot:
+  token: foobar
 experimental:
-  pilot:
-    token: foobar
+  kubernetesGateway: true
   plugins:
     Descriptor0:
       moduleName: foobar
@@ -392,3 +414,6 @@ experimental:
   devPlugin:
     goPath: foobar
     moduleName: foobar
+  http3: true
+  kubernetesGateway: true
+

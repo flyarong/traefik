@@ -3,7 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/stvp/go-udp-testing"
+	ptypes "github.com/traefik/paerser/types"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 func TestInfluxDB(t *testing.T) {
@@ -20,7 +21,7 @@ func TestInfluxDB(t *testing.T) {
 	// This is needed to make sure that UDP Listener listens for data a bit longer, otherwise it will quit after a millisecond
 	udp.Timeout = 5 * time.Second
 
-	influxDBRegistry := RegisterInfluxDB(context.Background(), &types.InfluxDB{Address: ":8089", PushInterval: types.Duration(time.Second), AddEntryPointsLabels: true, AddServicesLabels: true})
+	influxDBRegistry := RegisterInfluxDB(context.Background(), &types.InfluxDB{Address: ":8089", PushInterval: ptypes.Duration(time.Second), AddEntryPointsLabels: true, AddServicesLabels: true})
 	defer StopInfluxDB()
 
 	if !influxDBRegistry.IsEpEnabled() || !influxDBRegistry.IsSvcEnabled() {
@@ -63,12 +64,22 @@ func TestInfluxDB(t *testing.T) {
 	})
 
 	assertMessage(t, msgEntrypoint, expectedEntrypoint)
+
+	expectedTLS := []string{
+		`(traefik\.tls\.certs\.notAfterTimestamp,key=value value=1) [\d]{19}`,
+	}
+
+	msgTLS := udp.ReceiveString(t, func() {
+		influxDBRegistry.TLSCertsNotAfterTimestampGauge().With("key", "value").Set(1)
+	})
+
+	assertMessage(t, msgTLS, expectedTLS)
 }
 
 func TestInfluxDBHTTP(t *testing.T) {
 	c := make(chan *string)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "can't read body "+err.Error(), http.StatusBadRequest)
 			return
@@ -79,7 +90,7 @@ func TestInfluxDBHTTP(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	influxDBRegistry := RegisterInfluxDB(context.Background(), &types.InfluxDB{Address: ts.URL, Protocol: "http", PushInterval: types.Duration(time.Second), Database: "test", RetentionPolicy: "autogen", AddEntryPointsLabels: true, AddServicesLabels: true})
+	influxDBRegistry := RegisterInfluxDB(context.Background(), &types.InfluxDB{Address: ts.URL, Protocol: "http", PushInterval: ptypes.Duration(time.Second), Database: "test", RetentionPolicy: "autogen", AddEntryPointsLabels: true, AddServicesLabels: true})
 	defer StopInfluxDB()
 
 	if !influxDBRegistry.IsEpEnabled() || !influxDBRegistry.IsSvcEnabled() {
@@ -120,6 +131,15 @@ func TestInfluxDBHTTP(t *testing.T) {
 	msgEntrypoint := <-c
 
 	assertMessage(t, *msgEntrypoint, expectedEntrypoint)
+
+	expectedTLS := []string{
+		`(traefik\.tls\.certs\.notAfterTimestamp,key=value value=1) [\d]{19}`,
+	}
+
+	influxDBRegistry.TLSCertsNotAfterTimestampGauge().With("key", "value").Set(1)
+	msgTLS := <-c
+
+	assertMessage(t, *msgTLS, expectedTLS)
 }
 
 func assertMessage(t *testing.T, msg string, patterns []string) {

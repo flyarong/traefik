@@ -14,15 +14,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/patrickmn/go-cache"
-
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/job"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/provider"
-	"github.com/containous/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/job"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/provider"
+	"github.com/traefik/traefik/v2/pkg/safe"
 )
 
 // Provider holds configurations of the provider.
@@ -97,14 +95,16 @@ func (p *Provider) Init() error {
 }
 
 func (p *Provider) createClient(logger log.Logger) (*awsClient, error) {
-	sess, err := session.NewSession()
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	ec2meta := ec2metadata.New(sess)
-	if p.Region == "" {
-		logger.Infoln("No EC2 region provided, querying instance metadata endpoint...")
+	if p.Region == "" && ec2meta.Available() {
+		logger.Infoln("No region provided, querying instance metadata endpoint...")
 		identity, err := ec2meta.GetInstanceIdentityDocument()
 		if err != nil {
 			return nil, err
@@ -113,7 +113,6 @@ func (p *Provider) createClient(logger log.Logger) (*awsClient, error) {
 	}
 
 	cfg := &aws.Config{
-		Region: &p.Region,
 		Credentials: credentials.NewChainCredentials(
 			[]credentials.Provider{
 				&credentials.StaticProvider{
@@ -126,6 +125,11 @@ func (p *Provider) createClient(logger log.Logger) (*awsClient, error) {
 				&credentials.SharedCredentialsProvider{},
 				defaults.RemoteCredProvider(*(defaults.Config()), defaults.Handlers()),
 			}),
+	}
+
+	// Set the region if it is defined by the user or resolved from the EC2 metadata.
+	if p.Region != "" {
+		cfg.Region = &p.Region
 	}
 
 	cfg.WithLogger(aws.LoggerFunc(func(args ...interface{}) {
@@ -147,35 +151,25 @@ func (p Provider) Provide(configurationChan chan<- dynamic.Message, pool *safe.P
 		operation := func() error {
 			awsClient, err := p.createClient(logger)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to create AWS client: %w", err)
 			}
 
-			configuration, err := p.loadECSConfig(ctxLog, awsClient)
+			err = p.loadConfiguration(ctxLog, awsClient, configurationChan)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get ECS configuration: %w", err)
 			}
 
-			configurationChan <- dynamic.Message{
-				ProviderName:  "ecs",
-				Configuration: configuration,
-			}
-
-			reload := time.NewTicker(time.Second * time.Duration(p.RefreshSeconds))
-			defer reload.Stop()
+			ticker := time.NewTicker(time.Second * time.Duration(p.RefreshSeconds))
+			defer ticker.Stop()
 
 			for {
 				select {
-				case <-reload.C:
-					configuration, err := p.loadECSConfig(ctxLog, awsClient)
+				case <-ticker.C:
+					err = p.loadConfiguration(ctxLog, awsClient, configurationChan)
 					if err != nil {
-						logger.Errorf("Failed to load ECS configuration, error %s", err)
-						return err
+						return fmt.Errorf("failed to refresh ECS configuration: %w", err)
 					}
 
-					configurationChan <- dynamic.Message{
-						ProviderName:  "ecs",
-						Configuration: configuration,
-					}
 				case <-routineCtx.Done():
 					return nil
 				}
@@ -190,6 +184,20 @@ func (p Provider) Provide(configurationChan chan<- dynamic.Message, pool *safe.P
 			logger.Errorf("Cannot connect to Provider api %+v", err)
 		}
 	})
+
+	return nil
+}
+
+func (p *Provider) loadConfiguration(ctx context.Context, client *awsClient, configurationChan chan<- dynamic.Message) error {
+	instances, err := p.listInstances(ctx, client)
+	if err != nil {
+		return err
+	}
+
+	configurationChan <- dynamic.Message{
+		ProviderName:  "ecs",
+		Configuration: p.buildConfiguration(ctx, instances),
+	}
 
 	return nil
 }
@@ -359,15 +367,6 @@ func (p *Provider) listInstances(ctx context.Context, client *awsClient) ([]ecsI
 	}
 
 	return instances, nil
-}
-
-func (p *Provider) loadECSConfig(ctx context.Context, client *awsClient) (*dynamic.Configuration, error) {
-	instances, err := p.listInstances(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-
-	return p.buildConfiguration(ctx, instances), nil
 }
 
 func (p *Provider) lookupEc2Instances(ctx context.Context, client *awsClient, clusterName *string, ecsDatas map[string]*ecs.Task) (map[string]*ec2.Instance, error) {

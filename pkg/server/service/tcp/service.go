@@ -7,10 +7,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/config/runtime"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/server/provider"
-	"github.com/containous/traefik/v2/pkg/tcp"
+	"github.com/traefik/traefik/v2/pkg/config/runtime"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/server/provider"
+	"github.com/traefik/traefik/v2/pkg/tcp"
 )
 
 // Manager is the TCPHandlers factory.
@@ -59,7 +59,7 @@ func (m *Manager) BuildTCP(rootCtx context.Context, serviceName string) (tcp.Han
 				continue
 			}
 
-			handler, err := tcp.NewProxy(server.Address, duration)
+			handler, err := tcp.NewProxy(server.Address, duration, conf.LoadBalancer.ProxyProtocol)
 			if err != nil {
 				logger.Errorf("In service %q server %q: %v", serviceQualifiedName, server.Address, err)
 				continue

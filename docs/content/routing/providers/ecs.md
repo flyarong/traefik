@@ -10,7 +10,7 @@ Attach labels to your containers and let Traefik do the rest!
 !!! info "labels"
     
     - labels are case insensitive.
-    - The complete list of labels can be found [the reference page](../../reference/dynamic-configuration/ecs.md)
+    - The complete list of labels can be found in [the reference page](../../reference/dynamic-configuration/ecs.md).
 
 ### General
 
@@ -133,6 +133,15 @@ you'd add the label `traefik.http.services.{name-of-your-choice}.loadbalancer.pa
     traefik.http.services.myservice.loadbalancer.server.scheme=http
     ```
 
+??? info "`traefik.http.services.<service_name>.loadbalancer.serverstransport`"
+    
+    Allows to reference a ServersTransport resource that is defined either with the File provider or the Kubernetes CRD one.
+    See [serverstransport](../services/index.md#serverstransport) for more information.
+    
+    ```yaml
+    traefik.http.services.<service_name>.loadbalancer.serverstransport=foobar@file
+    ```
+
 ??? info "`traefik.http.services.<service_name>.loadbalancer.passhostheader`"
 
     See [pass Host header](../services/index.md#pass-host-header) for more information.
@@ -205,12 +214,12 @@ you'd add the label `traefik.http.services.{name-of-your-choice}.loadbalancer.pa
     traefik.http.services.myservice.loadbalancer.healthcheck.followredirects=true
     ```
 
-??? info "`traefik.http.services.<service_name>.loadbalancer.sticky`"
+??? info "`traefik.http.services.<service_name>.loadbalancer.sticky.cookie`"
     
     See [sticky sessions](../services/index.md#sticky-sessions) for more information.
     
     ```yaml
-    traefik.http.services.myservice.loadbalancer.sticky=true
+    traefik.http.services.myservice.loadbalancer.sticky.cookie=true
     ```
 
 ??? info "`traefik.http.services.<service_name>.loadbalancer.sticky.cookie.httponly`"
@@ -386,6 +395,14 @@ You can declare TCP Routers and/or Services using labels.
     
     ```yaml
     traefik.tcp.services.mytcpservice.loadbalancer.terminationdelay=100
+    ```
+
+??? info "`traefik.tcp.services.<service_name>.loadbalancer.proxyprotocol.version`"
+        
+    See [PROXY protocol](../services/index.md#proxy-protocol) for more information.
+    
+    ```yaml
+    traefik.tcp.services.mytcpservice.loadbalancer.proxyprotocol.version=1
     ```
 
 ### UDP

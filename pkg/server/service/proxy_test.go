@@ -1,13 +1,13 @@
 package service
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/testhelpers"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
 )
 
 type staticTransport struct {
@@ -21,14 +21,14 @@ func (t *staticTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 func BenchmarkProxy(b *testing.B) {
 	res := &http.Response{
 		StatusCode: 200,
-		Body:       ioutil.NopCloser(strings.NewReader("")),
+		Body:       io.NopCloser(strings.NewReader("")),
 	}
 
 	w := httptest.NewRecorder()
 	req := testhelpers.MustNewRequest(http.MethodGet, "http://foo.bar/", nil)
 
 	pool := newBufferPool()
-	handler, _ := buildProxy(Bool(false), nil, &staticTransport{res}, pool, nil)
+	handler, _ := buildProxy(Bool(false), nil, &staticTransport{res}, pool)
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

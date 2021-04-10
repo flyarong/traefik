@@ -11,12 +11,12 @@ env:
   global:
     - REPO=$TRAVIS_REPO_SLUG
     - VERSION=$TRAVIS_TAG
-    - CODENAME=picodon
+    - CODENAME=livarot
     - GO111MODULE=on
 
 script:
 - echo "Skipping tests... (Tests are executed on SemaphoreCI)"
-- if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then make docs; fi
+- if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then travis_retry make docs-pull-images && make docs; fi
 
 before_deploy:
   - >
@@ -25,12 +25,11 @@ before_deploy:
       sudo -E apt-get -yq update;
       sudo -E apt-get -yq --no-install-suggests --no-install-recommends --force-yes install docker-ce=${DOCKER_VERSION}*;
       docker version;
+      echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin;
       make build-image;
       if [ "$TRAVIS_TAG" ]; then
         make release-packages;
       fi;
-      curl -sfL https://raw.githubusercontent.com/containous/structor/master/godownloader.sh | bash -s -- -b "${GOPATH}/bin" ${STRUCTOR_VERSION}
-      structor -o containous -r traefik --dockerfile-url="https://raw.githubusercontent.com/containous/traefik/v1.7/docs.Dockerfile" --menu.js-url="https://raw.githubusercontent.com/containous/structor/master/traefik-menu.js.gotmpl" --rqts-url="https://raw.githubusercontent.com/containous/structor/master/requirements-override.txt" --force-edit-url --exp-branch=master --debug;
     fi
 
 deploy:
@@ -40,19 +39,12 @@ deploy:
     skip_cleanup: true
     file_glob: true
     on:
-      repo: containous/traefik
+      repo: traefik/traefik
       tags: true
   - provider: script
     script: sh script/deploy.sh
     skip_cleanup: true
     on:
-      repo: containous/traefik
+      repo: traefik/traefik
       tags: true
-  - provider: pages
-    edge: false
-    github_token: ${GITHUB_TOKEN}
-    local_dir: site
-    skip_cleanup: true
-    on:
-      repo: containous/traefik
-      all_branches: true
+

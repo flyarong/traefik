@@ -10,7 +10,7 @@ You can configure Traefik to use an ACME provider (like Let's Encrypt) for autom
 
     Use Let's Encrypt staging server with the [`caServer`](#caserver) configuration option
     when experimenting to avoid hitting this limit too fast.
-    
+
 ## Certificate Resolvers
 
 Traefik requires you to define "Certificate Resolvers" in the [static configuration](../getting-started/configuration-overview.md#the-static-configuration), 
@@ -303,14 +303,16 @@ For complete details, refer to your provider's _Additional configuration_ link.
 | [DNS Made Easy](https://dnsmadeeasy.com)                    | `dnsmadeeasy`  | `DNSMADEEASY_API_KEY`, `DNSMADEEASY_API_SECRET`, `DNSMADEEASY_SANDBOX`                                                                      | [Additional configuration](https://go-acme.github.io/lego/dns/dnsmadeeasy)  |
 | [DNSPod](https://www.dnspod.com/)                           | `dnspod`       | `DNSPOD_API_KEY`                                                                                                                            | [Additional configuration](https://go-acme.github.io/lego/dns/dnspod)       |
 | [Domain Offensive (do.de)](https://www.do.de/)              | `dode`         | `DODE_TOKEN`                                                                                                                                | [Additional configuration](https://go-acme.github.io/lego/dns/dode)         |
+| [Domeneshop](https://domene.shop)                           | `domeneshop`   | `DOMENESHOP_API_TOKEN`, `DOMENESHOP_API_SECRET`                                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/domeneshop)   |
 | [DreamHost](https://www.dreamhost.com/)                     | `dreamhost`    | `DREAMHOST_API_KEY`                                                                                                                         | [Additional configuration](https://go-acme.github.io/lego/dns/dreamhost)    |
 | [Duck DNS](https://www.duckdns.org/)                        | `duckdns`      | `DUCKDNS_TOKEN`                                                                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/duckdns)      |
 | [Dyn](https://dyn.com)                                      | `dyn`          | `DYN_CUSTOMER_NAME`, `DYN_USER_NAME`, `DYN_PASSWORD`                                                                                        | [Additional configuration](https://go-acme.github.io/lego/dns/dyn)          |
 | [Dynu](https://www.dynu.com)                                | `dynu`         | `DYNU_API_KEY`                                                                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/dynu)         |
 | [EasyDNS](https://easydns.com/)                             | `easydns`      | `EASYDNS_TOKEN`, `EASYDNS_KEY`                                                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/easydns)      |
+| [EdgeDNS](https://www.akamai.com/)                          | `edgedns`      | `AKAMAI_CLIENT_TOKEN`,  `AKAMAI_CLIENT_SECRET`,  `AKAMAI_ACCESS_TOKEN`                                                                      | [Additional configuration](https://go-acme.github.io/lego/dns/edgedns)      |
 | External Program                                            | `exec`         | `EXEC_PATH`                                                                                                                                 | [Additional configuration](https://go-acme.github.io/lego/dns/exec)         |
 | [Exoscale](https://www.exoscale.com)                        | `exoscale`     | `EXOSCALE_API_KEY`, `EXOSCALE_API_SECRET`, `EXOSCALE_ENDPOINT`                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/exoscale)     |
-| [Fast DNS](https://www.akamai.com/)                         | `fastdns`      | `AKAMAI_CLIENT_TOKEN`,  `AKAMAI_CLIENT_SECRET`,  `AKAMAI_ACCESS_TOKEN`                                                                      | [Additional configuration](https://go-acme.github.io/lego/dns/fastdns)      |
+| [Fast DNS](https://www.akamai.com/)                         | `fastdns`      | `AKAMAI_CLIENT_TOKEN`,  `AKAMAI_CLIENT_SECRET`,  `AKAMAI_ACCESS_TOKEN`                                                                      | [Additional configuration](https://go-acme.github.io/lego/dns/edgedns)      |
 | [Gandi](https://www.gandi.net)                              | `gandi`        | `GANDI_API_KEY`                                                                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/gandi)        |
 | [Gandi v5](http://doc.livedns.gandi.net)                    | `gandiv5`      | `GANDIV5_API_KEY`                                                                                                                           | [Additional configuration](https://go-acme.github.io/lego/dns/gandiv5)      |
 | [Glesys](https://glesys.com/)                               | `glesys`       | `GLESYS_API_USER`, `GLESYS_API_KEY`, `GLESYS_DOMAIN`                                                                                        | [Additional configuration](https://go-acme.github.io/lego/dns/glesys)       |
@@ -319,13 +321,16 @@ For complete details, refer to your provider's _Additional configuration_ link.
 | [Hetzner](https://hetzner.com)                              | `hetzner`      | `HETZNER_API_KEY`                                                                                                                           | [Additional configuration](https://go-acme.github.io/lego/dns/hetzner)      |
 | [hosting.de](https://www.hosting.de)                        | `hostingde`    | `HOSTINGDE_API_KEY`, `HOSTINGDE_ZONE_NAME`                                                                                                  | [Additional configuration](https://go-acme.github.io/lego/dns/hostingde)    |
 | HTTP request                                                | `httpreq`      | `HTTPREQ_ENDPOINT`, `HTTPREQ_MODE`, `HTTPREQ_USERNAME`, `HTTPREQ_PASSWORD` [^1]                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/httpreq)      |
+| [HyperOne](https://www.hyperone.com)                        | `hyperone`     | `HYPERONE_PASSPORT_LOCATION`, `HYPERONE_LOCATION_ID`                                                                                        | [Additional configuration](https://go-acme.github.io/lego/dns/hyperone)     |
 | [IIJ](https://www.iij.ad.jp/)                               | `iij`          | `IIJ_API_ACCESS_KEY`, `IIJ_API_SECRET_KEY`, `IIJ_DO_SERVICE_CODE`                                                                           | [Additional configuration](https://go-acme.github.io/lego/dns/iij)          |
+| [Infomaniak](https://www.infomaniak.com)                    | `infomaniak`   | `INFOMANIAK_ACCESS_TOKEN`                                                                                                                   | [Additional configuration](https://go-acme.github.io/lego/dns/infomaniak)   |
 | [INWX](https://www.inwx.de/en)                              | `inwx`         | `INWX_USERNAME`, `INWX_PASSWORD`                                                                                                            | [Additional configuration](https://go-acme.github.io/lego/dns/inwx)         |
-| [Joker.com](https://joker.com)                              | `joker`        | `JOKER_API_KEY` or `JOKER_USERNAME`, `JOKER_PASSWORD`                                                                                       | [Additional configuration](https://go-acme.github.io/lego/dns/joker)        |
+| [ionos](https://ionos.com/)                                 | `ionos`        | `IONOS_API_KEY`                                                                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/ionos)        |
+| [Joker.com](https://joker.com)                              | `joker`        | `JOKER_API_MODE` with `JOKER_API_KEY` or `JOKER_USERNAME`, `JOKER_PASSWORD`                                                                 | [Additional configuration](https://go-acme.github.io/lego/dns/joker)        |
 | [Lightsail](https://aws.amazon.com/lightsail/)              | `lightsail`    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `DNS_ZONE`                                                                                    | [Additional configuration](https://go-acme.github.io/lego/dns/lightsail)    |
-| [Linode](https://www.linode.com)                            | `linode`       | `LINODE_API_KEY`                                                                                                                            | [Additional configuration](https://go-acme.github.io/lego/dns/linode)       |
-| [Linode v4](https://www.linode.com)                         | `linodev4`     | `LINODE_TOKEN`                                                                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/linodev4)     |
+| [Linode v4](https://www.linode.com)                         | `linode`       | `LINODE_TOKEN`                                                                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/linode)       |
 | [Liquid Web](https://www.liquidweb.com/)                    | `liquidweb`    | `LIQUID_WEB_PASSWORD`, `LIQUID_WEB_USERNAME`, `LIQUID_WEB_ZONE`                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/liquidweb)    |
+| [Loopia](https://loopia.com/)                               | `loopia`       | `LOOPIA_API_PASSWORD`, `LOOPIA_API_USER`                                                                                                    | [Additional configuration](https://go-acme.github.io/lego/dns/loopia)       |
 | [LuaDNS](https://luadns.com)                                | `luadns`       | `LUADNS_API_USERNAME`, `LUADNS_API_TOKEN`                                                                                                   | [Additional configuration](https://go-acme.github.io/lego/dns/luadns)       |
 | manual                                                      | `manual`       | none, but you need to run Traefik interactively [^4], turn on debug log to see instructions and press <kbd>Enter</kbd>.                     |                                                                             |
 | [MyDNS.jp](https://www.mydns.jp/)                           | `mydnsjp`      | `MYDNSJP_MASTER_ID`, `MYDNSJP_PASSWORD`                                                                                                     | [Additional configuration](https://go-acme.github.io/lego/dns/mydnsjp)      |
@@ -336,7 +341,8 @@ For complete details, refer to your provider's _Additional configuration_ link.
 | [Netcup](https://www.netcup.eu/)                            | `netcup`       | `NETCUP_CUSTOMER_NUMBER`, `NETCUP_API_KEY`, `NETCUP_API_PASSWORD`                                                                           | [Additional configuration](https://go-acme.github.io/lego/dns/netcup)       |
 | [Netlify](https://www.netlify.com)                          | `netlify`      | `NETLIFY_TOKEN`                                                                                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/netlify)      |
 | [NIFCloud](https://cloud.nifty.com/service/dns.htm)         | `nifcloud`     | `NIFCLOUD_ACCESS_KEY_ID`, `NIFCLOUD_SECRET_ACCESS_KEY`                                                                                      | [Additional configuration](https://go-acme.github.io/lego/dns/nifcloud)     |
-| [Ns1](https://ns1.com/)                                     | `ns1`          | `NS1_API_KEY`                                                                                                                               | [Additional configuration](https://go-acme.github.io/lego/dns/ns1)          |
+| [Njalla](https://njal.la)                                   | `njalla`       | `NJALLA_TOKEN`                                                                                                                              | [Additional configuration](https://go-acme.github.io/lego/dns/njalla)       |
+| [NS1](https://ns1.com/)                                     | `ns1`          | `NS1_API_KEY`                                                                                                                               | [Additional configuration](https://go-acme.github.io/lego/dns/ns1)          |
 | [Open Telekom Cloud](https://cloud.telekom.de)              | `otc`          | `OTC_DOMAIN_NAME`, `OTC_USER_NAME`, `OTC_PASSWORD`, `OTC_PROJECT_NAME`, `OTC_IDENTITY_ENDPOINT`                                             | [Additional configuration](https://go-acme.github.io/lego/dns/otc)          |
 | [OVH](https://www.ovh.com)                                  | `ovh`          | `OVH_ENDPOINT`, `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`                                                         | [Additional configuration](https://go-acme.github.io/lego/dns/ovh)          |
 | [Openstack Designate](https://docs.openstack.org/designate) | `designate`    | `OS_AUTH_URL`, `OS_USERNAME`, `OS_PASSWORD`, `OS_TENANT_NAME`, `OS_REGION_NAME`                                                             | [Additional configuration](https://go-acme.github.io/lego/dns/designate)    |
@@ -362,7 +368,7 @@ For complete details, refer to your provider's _Additional configuration_ link.
 | [Zonomi](https://zonomi.com)                                | `zonomi`       | `ZONOMI_API_KEY`                                                                                                                            | [Additional configuration](https://go-acme.github.io/lego/dns/zonomi)       |
 
 [^1]: more information about the HTTP message format can be found [here](https://go-acme.github.io/lego/dns/httpreq/)
-[^2]: [providing_credentials_to_your_application](https://cloud.google.com/docs/authentication/production#providing_credentials_to_your_application)
+[^2]: [providing_credentials_to_your_application](https://cloud.google.com/docs/authentication/production)
 [^3]: [google/default.go](https://github.com/golang/oauth2/blob/36a7019397c4c86cf59eeab3bc0d188bac444277/google/default.go#L61-L76)
 [^4]: `docker stack` remark: there is no way to support terminal attached to container when deploying with `docker stack`, so you might need to run container with `docker run -it` to generate certificates using `manual` provider.
 [^5]: The `Global API Key` needs to be used, not the `Origin CA Key`.
@@ -405,6 +411,35 @@ certificatesResolvers:
 
 [ACME V2](https://community.letsencrypt.org/t/acme-v2-and-wildcard-certificate-support-is-live/55579) supports wildcard certificates.
 As described in [Let's Encrypt's post](https://community.letsencrypt.org/t/staging-endpoint-for-acme-v2/49605) wildcard certificates can only be generated through a [`DNS-01` challenge](#dnschallenge).
+
+## External Account Binding
+
+- `kid`: Key identifier from External CA
+- `hmacEncoded`: HMAC key from External CA, should be in Base64 URL Encoding without padding format
+
+```toml tab="File (TOML)"
+[certificatesResolvers.myresolver.acme]
+  # ...
+  [certificatesResolvers.myresolver.acme.eab]
+    kid = "abc-keyID-xyz"
+    hmacEncoded = "abc-hmac-xyz"
+```
+
+```yaml tab="File (YAML)"
+certificatesResolvers:
+  myresolver:
+    acme:
+      # ...
+      eab:
+        kid: abc-keyID-xyz
+        hmacEncoded: abc-hmac-xyz
+```
+
+```bash tab="CLI"
+# ...
+--certificatesresolvers.myresolver.acme.eab.kid=abc-keyID-xyz
+--certificatesresolvers.myresolver.acme.eab.hmacencoded=abc-hmac-xyz
+```
 
 ## More Configuration
 
@@ -483,6 +518,65 @@ docker run -v "/my/host/acme:/etc/traefik/acme" traefik
 
 !!! warning
     For concurrency reasons, this file cannot be shared across multiple instances of Traefik.
+
+### `preferredChain`
+
+_Optional, Default=""_
+
+Preferred chain to use.
+
+If the CA offers multiple certificate chains, prefer the chain with an issuer matching this Subject Common Name.
+If no match, the default offered chain will be used.
+
+```toml tab="File (TOML)"
+[certificatesResolvers.myresolver.acme]
+  # ...
+  preferredChain = "ISRG Root X1"
+  # ...
+```
+
+```yaml tab="File (YAML)"
+certificatesResolvers:
+  myresolver:
+    acme:
+      # ...
+      preferredChain: 'ISRG Root X1'
+      # ...
+```
+
+```bash tab="CLI"
+# ...
+--certificatesresolvers.myresolver.acme.preferredChain="ISRG Root X1"
+# ...
+```
+
+### `keyType`
+
+_Optional, Default="RSA4096"_
+
+KeyType used for generating certificate private key. Allow value 'EC256', 'EC384', 'RSA2048', 'RSA4096', 'RSA8192'.
+
+```toml tab="File (TOML)"
+[certificatesResolvers.myresolver.acme]
+  # ...
+  keyType = "RSA4096"
+  # ...
+```
+
+```yaml tab="File (YAML)"
+certificatesResolvers:
+  myresolver:
+    acme:
+      # ...
+      keyType: 'RSA4096'
+      # ...
+```
+
+```bash tab="CLI"
+# ...
+--certificatesresolvers.myresolver.acme.keyType="RSA4096"
+# ...
+```
 
 ## Fallback
 

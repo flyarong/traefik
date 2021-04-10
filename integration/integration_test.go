@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -13,11 +12,12 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
-	"github.com/containous/traefik/v2/pkg/log"
 	"github.com/fatih/structs"
 	"github.com/go-check/check"
 	compose "github.com/libkermit/compose/check"
+	"github.com/traefik/traefik/v2/pkg/log"
 	checker "github.com/vdemeester/shakers"
 )
 
@@ -120,6 +120,15 @@ func (s *BaseSuite) cmdTraefik(args ...string) (*exec.Cmd, *bytes.Buffer) {
 	return cmd, &out
 }
 
+func (s *BaseSuite) killCmd(cmd *exec.Cmd) {
+	err := cmd.Process.Kill()
+	if err != nil {
+		log.WithoutContext().Errorf("Kill: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+}
+
 func (s *BaseSuite) traefikCmd(args ...string) (*exec.Cmd, func(*check.C)) {
 	cmd, out := s.cmdTraefik(args...)
 	return cmd, func(c *check.C) {
@@ -133,7 +142,7 @@ func (s *BaseSuite) traefikCmd(args ...string) (*exec.Cmd, func(*check.C)) {
 func (s *BaseSuite) displayLogK3S(c *check.C) {
 	filePath := "./fixtures/k8s/config.skip/k3s.log"
 	if _, err := os.Stat(filePath); err == nil {
-		content, errR := ioutil.ReadFile(filePath)
+		content, errR := os.ReadFile(filePath)
 		if errR != nil {
 			log.WithoutContext().Error(errR)
 		}
@@ -168,7 +177,7 @@ func (s *BaseSuite) adaptFile(c *check.C, path string, tempObjects interface{}) 
 	c.Assert(err, checker.IsNil)
 
 	folder, prefix := filepath.Split(path)
-	tmpFile, err := ioutil.TempFile(folder, strings.TrimSuffix(prefix, filepath.Ext(prefix))+"_*"+filepath.Ext(prefix))
+	tmpFile, err := os.CreateTemp(folder, strings.TrimSuffix(prefix, filepath.Ext(prefix))+"_*"+filepath.Ext(prefix))
 	c.Assert(err, checker.IsNil)
 	defer tmpFile.Close()
 

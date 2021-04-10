@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
 )
 
 func TestHandler(t *testing.T) {
@@ -29,6 +29,7 @@ func TestHandler(t *testing.T) {
 				fmt.Fprintln(w, "My error page.")
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusOK, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), http.StatusText(http.StatusOK))
 			},
@@ -41,6 +42,7 @@ func TestHandler(t *testing.T) {
 				fmt.Fprintln(w, "My error page.")
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusPartialContent, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), http.StatusText(http.StatusPartialContent))
 			},
@@ -53,6 +55,7 @@ func TestHandler(t *testing.T) {
 				fmt.Fprintln(w, "whatever, should not be called")
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusNotModified, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), "")
 			},
@@ -65,6 +68,7 @@ func TestHandler(t *testing.T) {
 				fmt.Fprintln(w, "My error page.")
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusInternalServerError, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), "My error page.")
 				assert.NotContains(t, recorder.Body.String(), "oops", "Should not return the oops page")
@@ -78,6 +82,7 @@ func TestHandler(t *testing.T) {
 				fmt.Fprintln(w, "My error page.")
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusBadGateway, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), http.StatusText(http.StatusBadGateway))
 				assert.NotContains(t, recorder.Body.String(), "Test Server", "Should return the oops page since we have not configured the 502 code")
@@ -95,6 +100,7 @@ func TestHandler(t *testing.T) {
 				}
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusServiceUnavailable, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), "My 503 page.")
 				assert.NotContains(t, recorder.Body.String(), "oops", "Should not return the oops page")
@@ -112,6 +118,7 @@ func TestHandler(t *testing.T) {
 				}
 			}),
 			validate: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusServiceUnavailable, recorder.Code, "HTTP status")
 				assert.Contains(t, recorder.Body.String(), "My 503 page.")
 				assert.NotContains(t, recorder.Body.String(), "oops", "Should not return the oops page")
@@ -150,7 +157,7 @@ type mockServiceBuilder struct {
 	handler http.Handler
 }
 
-func (m *mockServiceBuilder) BuildHTTP(_ context.Context, serviceName string, responseModifier func(*http.Response) error) (http.Handler, error) {
+func (m *mockServiceBuilder) BuildHTTP(_ context.Context, _ string) (http.Handler, error) {
 	return m.handler, nil
 }
 

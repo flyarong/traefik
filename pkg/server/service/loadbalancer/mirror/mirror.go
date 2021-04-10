@@ -7,14 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"sync"
 
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/middlewares/accesslog"
-	"github.com/containous/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/middlewares/accesslog"
+	"github.com/traefik/traefik/v2/pkg/safe"
 )
 
 // Mirroring is an http.Handler that can mirror requests.
@@ -81,14 +80,14 @@ func (m *Mirroring) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	logger := log.FromContext(req.Context())
 	rr, bytesRead, err := newReusableRequest(req, m.maxBodySize)
-	if err != nil && err != errBodyTooLarge {
+	if err != nil && !errors.Is(err, errBodyTooLarge) {
 		http.Error(rw, http.StatusText(http.StatusInternalServerError)+
 			fmt.Sprintf("error creating reusable request: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	if err == errBodyTooLarge {
-		req.Body = ioutil.NopCloser(io.MultiReader(bytes.NewReader(bytesRead), req.Body))
+	if errors.Is(err, errBodyTooLarge) {
+		req.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bytesRead), req.Body))
 		m.handler.ServeHTTP(rw, req)
 		logger.Debugf("no mirroring, request body larger than allowed size")
 		return
@@ -147,8 +146,8 @@ func (b blackHoleResponseWriter) Header() http.Header {
 	return http.Header{}
 }
 
-func (b blackHoleResponseWriter) Write(bytes []byte) (int, error) {
-	return len(bytes), nil
+func (b blackHoleResponseWriter) Write(data []byte) (int, error) {
+	return len(data), nil
 }
 
 func (b blackHoleResponseWriter) WriteHeader(statusCode int) {}
@@ -182,7 +181,7 @@ func newReusableRequest(req *http.Request, maxBodySize int64) (*reusableRequest,
 
 	// unbounded body size
 	if maxBodySize < 0 {
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -196,13 +195,13 @@ func newReusableRequest(req *http.Request, maxBodySize int64) (*reusableRequest,
 	// the request body is larger than what we allow for the mirrors.
 	body := make([]byte, maxBodySize+1)
 	n, err := io.ReadFull(req.Body, body)
-	if err != nil && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return nil, nil, err
 	}
 
 	// we got an ErrUnexpectedEOF, which means there was less than maxBodySize data to read,
 	// which permits us sending also to all the mirrors later.
-	if err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return &reusableRequest{
 			req:  req,
 			body: body[:n],
@@ -217,7 +216,7 @@ func (rr reusableRequest) clone(ctx context.Context) *http.Request {
 	req := rr.req.Clone(ctx)
 
 	if rr.body != nil {
-		req.Body = ioutil.NopCloser(bytes.NewReader(rr.body))
+		req.Body = io.NopCloser(bytes.NewReader(rr.body))
 	}
 
 	return req

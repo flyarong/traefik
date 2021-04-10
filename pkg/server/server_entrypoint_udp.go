@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/udp"
+	"github.com/traefik/traefik/v2/pkg/config/static"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/udp"
 )
 
 // UDPEntryPoints maps UDP entry points by their names.
@@ -89,7 +89,8 @@ func NewUDPEntryPoint(cfg *static.EntryPoint) (*UDPEntryPoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	listener, err := udp.Listen("udp", addr)
+
+	listener, err := udp.Listen("udp", addr, time.Duration(cfg.UDP.Timeout))
 	if err != nil {
 		return nil, err
 	}

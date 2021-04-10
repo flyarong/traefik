@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/testhelpers"
-	"github.com/containous/traefik/v2/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	ptypes "github.com/traefik/paerser/types"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/testhelpers"
 	"github.com/vulcand/oxy/utils"
 )
 
@@ -37,7 +38,7 @@ func TestNewRateLimiter(t *testing.T) {
 			desc: "maxDelay computation, low rate regime",
 			config: dynamic.RateLimit{
 				Average: 2,
-				Period:  types.Duration(10 * time.Second),
+				Period:  ptypes.Duration(10 * time.Second),
 				Burst:   10,
 			},
 			expectedMaxDelay: 500 * time.Millisecond,
@@ -183,7 +184,7 @@ func TestRateLimit(t *testing.T) {
 			desc: "lower than 1/s",
 			config: dynamic.RateLimit{
 				Average: 5,
-				Period:  types.Duration(10 * time.Second),
+				Period:  ptypes.Duration(10 * time.Second),
 			},
 			loadDuration: 2 * time.Second,
 			incomingLoad: 100,
@@ -193,7 +194,7 @@ func TestRateLimit(t *testing.T) {
 			desc: "lower than 1/s, longer",
 			config: dynamic.RateLimit{
 				Average: 5,
-				Period:  types.Duration(10 * time.Second),
+				Period:  ptypes.Duration(10 * time.Second),
 			},
 			loadDuration: time.Minute,
 			incomingLoad: 100,
@@ -203,7 +204,7 @@ func TestRateLimit(t *testing.T) {
 			desc: "lower than 1/s, longer, harsher",
 			config: dynamic.RateLimit{
 				Average: 1,
-				Period:  types.Duration(time.Minute),
+				Period:  ptypes.Duration(time.Minute),
 			},
 			loadDuration: time.Minute,
 			incomingLoad: 100,
@@ -213,7 +214,7 @@ func TestRateLimit(t *testing.T) {
 			desc: "period below 1 second",
 			config: dynamic.RateLimit{
 				Average: 50,
-				Period:  types.Duration(500 * time.Millisecond),
+				Period:  ptypes.Duration(500 * time.Millisecond),
 			},
 			loadDuration: 2 * time.Second,
 			incomingLoad: 300,
@@ -279,10 +280,12 @@ func TestRateLimit(t *testing.T) {
 				// actual default value
 				burst = 1
 			}
+
 			period := time.Duration(test.config.Period)
 			if period == 0 {
 				period = time.Second
 			}
+
 			if test.config.Average == 0 {
 				if reqCount < 75*test.incomingLoad/100 {
 					t.Fatalf("we (arbitrarily) expect at least 75%% of the requests to go through with no rate limiting, and yet only %d/%d went through", reqCount, test.incomingLoad)
@@ -297,14 +300,18 @@ func TestRateLimit(t *testing.T) {
 			// we take into account the configured burst,
 			// because it also helps absorbing non-bursty traffic.
 			rate := float64(test.config.Average) / float64(period)
+
 			wantCount := int(int64(rate*float64(test.loadDuration)) + burst)
+
 			// Allow for a 2% leeway
 			maxCount := wantCount * 102 / 100
+
 			// With very high CPU loads,
 			// we can expect some extra delay in addition to the rate limiting we already do,
 			// so we allow for some extra leeway there.
 			// Feel free to adjust wrt to the load on e.g. the CI.
-			minCount := wantCount * 95 / 100
+			minCount := computeMinCount(wantCount)
+
 			if reqCount < minCount {
 				t.Fatalf("rate was slower than expected: %d requests (wanted > %d) in %v", reqCount, minCount, elapsed)
 			}
@@ -313,4 +320,12 @@ func TestRateLimit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func computeMinCount(wantCount int) int {
+	if os.Getenv("CI") != "" {
+		return wantCount * 60 / 100
+	}
+
+	return wantCount * 95 / 100
 }

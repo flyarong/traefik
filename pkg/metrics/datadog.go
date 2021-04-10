@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/types"
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/dogstatsd"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/types"
 )
 
 var datadogClient = dogstatsd.New("traefik.", kitlog.LoggerFunc(func(keyvals ...interface{}) error {
@@ -20,18 +20,19 @@ var datadogTicker *time.Ticker
 
 // Metric names consistent with https://github.com/DataDog/integrations-extras/pull/64
 const (
-	ddMetricsServiceReqsName      = "service.request.total"
-	ddMetricsServiceLatencyName   = "service.request.duration"
-	ddRetriesTotalName            = "service.retries.total"
-	ddConfigReloadsName           = "config.reload.total"
-	ddConfigReloadsFailureTagName = "failure"
-	ddLastConfigReloadSuccessName = "config.reload.lastSuccessTimestamp"
-	ddLastConfigReloadFailureName = "config.reload.lastFailureTimestamp"
-	ddEntryPointReqsName          = "entrypoint.request.total"
-	ddEntryPointReqDurationName   = "entrypoint.request.duration"
-	ddEntryPointOpenConnsName     = "entrypoint.connections.open"
-	ddOpenConnsName               = "service.connections.open"
-	ddServerUpName                = "service.server.up"
+	ddMetricsServiceReqsName        = "service.request.total"
+	ddMetricsServiceLatencyName     = "service.request.duration"
+	ddRetriesTotalName              = "service.retries.total"
+	ddConfigReloadsName             = "config.reload.total"
+	ddConfigReloadsFailureTagName   = "failure"
+	ddLastConfigReloadSuccessName   = "config.reload.lastSuccessTimestamp"
+	ddLastConfigReloadFailureName   = "config.reload.lastFailureTimestamp"
+	ddEntryPointReqsName            = "entrypoint.request.total"
+	ddEntryPointReqDurationName     = "entrypoint.request.duration"
+	ddEntryPointOpenConnsName       = "entrypoint.connections.open"
+	ddOpenConnsName                 = "service.connections.open"
+	ddServerUpName                  = "service.server.up"
+	ddTLSCertsNotAfterTimestampName = "tls.certs.notAfterTimestamp"
 )
 
 // RegisterDatadog registers the metrics pusher if this didn't happen yet and creates a datadog Registry instance.
@@ -41,10 +42,11 @@ func RegisterDatadog(ctx context.Context, config *types.Datadog) Registry {
 	}
 
 	registry := &standardRegistry{
-		configReloadsCounter:         datadogClient.NewCounter(ddConfigReloadsName, 1.0),
-		configReloadsFailureCounter:  datadogClient.NewCounter(ddConfigReloadsName, 1.0).With(ddConfigReloadsFailureTagName, "true"),
-		lastConfigReloadSuccessGauge: datadogClient.NewGauge(ddLastConfigReloadSuccessName),
-		lastConfigReloadFailureGauge: datadogClient.NewGauge(ddLastConfigReloadFailureName),
+		configReloadsCounter:           datadogClient.NewCounter(ddConfigReloadsName, 1.0),
+		configReloadsFailureCounter:    datadogClient.NewCounter(ddConfigReloadsName, 1.0).With(ddConfigReloadsFailureTagName, "true"),
+		lastConfigReloadSuccessGauge:   datadogClient.NewGauge(ddLastConfigReloadSuccessName),
+		lastConfigReloadFailureGauge:   datadogClient.NewGauge(ddLastConfigReloadFailureName),
+		tlsCertsNotAfterTimestampGauge: datadogClient.NewGauge(ddTLSCertsNotAfterTimestampName),
 	}
 
 	if config.AddEntryPointsLabels {

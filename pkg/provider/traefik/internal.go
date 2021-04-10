@@ -7,12 +7,12 @@ import (
 	"net"
 	"regexp"
 
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/provider"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/tls"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/config/static"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/provider"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/tls"
 )
 
 const defaultInternalEntryPointName = "traefik"
@@ -49,10 +49,11 @@ func (i *Provider) Init() error {
 func (i *Provider) createConfiguration(ctx context.Context) *dynamic.Configuration {
 	cfg := &dynamic.Configuration{
 		HTTP: &dynamic.HTTPConfiguration{
-			Routers:     make(map[string]*dynamic.Router),
-			Middlewares: make(map[string]*dynamic.Middleware),
-			Services:    make(map[string]*dynamic.Service),
-			Models:      make(map[string]*dynamic.Model),
+			Routers:           make(map[string]*dynamic.Router),
+			Middlewares:       make(map[string]*dynamic.Middleware),
+			Services:          make(map[string]*dynamic.Service),
+			Models:            make(map[string]*dynamic.Model),
+			ServersTransports: make(map[string]*dynamic.ServersTransport),
 		},
 		TCP: &dynamic.TCPConfiguration{
 			Routers:  make(map[string]*dynamic.TCPRouter),
@@ -70,10 +71,39 @@ func (i *Provider) createConfiguration(ctx context.Context) *dynamic.Configurati
 	i.prometheusConfiguration(cfg)
 	i.entryPointModels(cfg)
 	i.redirection(ctx, cfg)
+	i.serverTransport(cfg)
+
+	i.acme(cfg)
 
 	cfg.HTTP.Services["noop"] = &dynamic.Service{}
 
 	return cfg
+}
+
+func (i *Provider) acme(cfg *dynamic.Configuration) {
+	var eps []string
+
+	uniq := map[string]struct{}{}
+	for _, resolver := range i.staticCfg.CertificatesResolvers {
+		if resolver.ACME != nil && resolver.ACME.HTTPChallenge != nil && resolver.ACME.HTTPChallenge.EntryPoint != "" {
+			if _, ok := uniq[resolver.ACME.HTTPChallenge.EntryPoint]; !ok {
+				eps = append(eps, resolver.ACME.HTTPChallenge.EntryPoint)
+				uniq[resolver.ACME.HTTPChallenge.EntryPoint] = struct{}{}
+			}
+		}
+	}
+
+	if len(eps) > 0 {
+		rt := &dynamic.Router{
+			Rule:        "PathPrefix(`/.well-known/acme-challenge/`)",
+			EntryPoints: eps,
+			Service:     "acme-http@internal",
+			Priority:    math.MaxInt32,
+		}
+
+		cfg.HTTP.Routers["acme-http"] = rt
+		cfg.HTTP.Services["acme-http"] = &dynamic.Service{}
+	}
 }
 
 func (i *Provider) redirection(ctx context.Context, cfg *dynamic.Configuration) {
@@ -142,7 +172,7 @@ func (i *Provider) getEntryPointPort(name string, def *static.Redirections) (str
 		return "", fmt.Errorf("'to' entry point field references a non-existing entry point: %s", def.EntryPoint.To)
 	}
 
-	_, port, err := net.SplitHostPort(dst.Address)
+	_, port, err := net.SplitHostPort(dst.GetAddress())
 	if err != nil {
 		return "", fmt.Errorf("invalid entry point %q address %q: %w",
 			name, i.staticCfg.EntryPoints[def.EntryPoint.To].Address, err)
@@ -273,4 +303,26 @@ func (i *Provider) prometheusConfiguration(cfg *dynamic.Configuration) {
 	}
 
 	cfg.HTTP.Services["prometheus"] = &dynamic.Service{}
+}
+
+func (i *Provider) serverTransport(cfg *dynamic.Configuration) {
+	if i.staticCfg.ServersTransport == nil {
+		return
+	}
+
+	st := &dynamic.ServersTransport{
+		InsecureSkipVerify:  i.staticCfg.ServersTransport.InsecureSkipVerify,
+		RootCAs:             i.staticCfg.ServersTransport.RootCAs,
+		MaxIdleConnsPerHost: i.staticCfg.ServersTransport.MaxIdleConnsPerHost,
+	}
+
+	if i.staticCfg.ServersTransport.ForwardingTimeouts != nil {
+		st.ForwardingTimeouts = &dynamic.ForwardingTimeouts{
+			DialTimeout:           i.staticCfg.ServersTransport.ForwardingTimeouts.DialTimeout,
+			ResponseHeaderTimeout: i.staticCfg.ServersTransport.ForwardingTimeouts.ResponseHeaderTimeout,
+			IdleConnTimeout:       i.staticCfg.ServersTransport.ForwardingTimeouts.IdleConnTimeout,
+		}
+	}
+
+	cfg.HTTP.ServersTransports["default"] = st
 }

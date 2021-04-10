@@ -5,19 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
 
-	"github.com/Masterminds/sprig"
-	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/config/file"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/provider"
-	"github.com/containous/traefik/v2/pkg/safe"
-	"github.com/containous/traefik/v2/pkg/tls"
+	"github.com/Masterminds/sprig/v3"
+	"github.com/traefik/paerser/file"
+	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/provider"
+	"github.com/traefik/traefik/v2/pkg/safe"
+	"github.com/traefik/traefik/v2/pkg/tls"
 	"gopkg.in/fsnotify.v1"
 )
 
@@ -197,7 +196,7 @@ func flattenCertificates(ctx context.Context, tlsConfig *dynamic.TLSConfiguratio
 }
 
 func (p *Provider) loadFileConfigFromDirectory(ctx context.Context, directory string, configuration *dynamic.Configuration) (*dynamic.Configuration, error) {
-	fileList, err := ioutil.ReadDir(directory)
+	fileList, err := os.ReadDir(directory)
 	if err != nil {
 		return configuration, fmt.Errorf("unable to read directory %s: %w", directory, err)
 	}
@@ -205,9 +204,10 @@ func (p *Provider) loadFileConfigFromDirectory(ctx context.Context, directory st
 	if configuration == nil {
 		configuration = &dynamic.Configuration{
 			HTTP: &dynamic.HTTPConfiguration{
-				Routers:     make(map[string]*dynamic.Router),
-				Middlewares: make(map[string]*dynamic.Middleware),
-				Services:    make(map[string]*dynamic.Service),
+				Routers:           make(map[string]*dynamic.Router),
+				Middlewares:       make(map[string]*dynamic.Middleware),
+				Services:          make(map[string]*dynamic.Service),
+				ServersTransports: make(map[string]*dynamic.ServersTransport),
 			},
 			TCP: &dynamic.TCPConfiguration{
 				Routers:  make(map[string]*dynamic.TCPRouter),
@@ -271,6 +271,14 @@ func (p *Provider) loadFileConfigFromDirectory(ctx context.Context, directory st
 				logger.WithField(log.ServiceName, name).Warn("HTTP service already configured, skipping")
 			} else {
 				configuration.HTTP.Services[name] = conf
+			}
+		}
+
+		for name, conf := range c.HTTP.ServersTransports {
+			if _, exists := configuration.HTTP.ServersTransports[name]; exists {
+				logger.WithField(log.ServersTransportName, name).Warn("HTTP servers transport already configured, skipping")
+			} else {
+				configuration.HTTP.ServersTransports[name] = conf
 			}
 		}
 
@@ -398,9 +406,10 @@ func (p *Provider) DecodeConfiguration(filename string) (*dynamic.Configuration,
 func (p *Provider) decodeConfiguration(filePath, content string) (*dynamic.Configuration, error) {
 	configuration := &dynamic.Configuration{
 		HTTP: &dynamic.HTTPConfiguration{
-			Routers:     make(map[string]*dynamic.Router),
-			Middlewares: make(map[string]*dynamic.Middleware),
-			Services:    make(map[string]*dynamic.Service),
+			Routers:           make(map[string]*dynamic.Router),
+			Middlewares:       make(map[string]*dynamic.Middleware),
+			Services:          make(map[string]*dynamic.Service),
+			ServersTransports: make(map[string]*dynamic.ServersTransport),
 		},
 		TCP: &dynamic.TCPConfiguration{
 			Routers:  make(map[string]*dynamic.TCPRouter),
@@ -426,7 +435,7 @@ func (p *Provider) decodeConfiguration(filePath, content string) (*dynamic.Confi
 
 func readFile(filename string) (string, error) {
 	if len(filename) > 0 {
-		buf, err := ioutil.ReadFile(filename)
+		buf, err := os.ReadFile(filename)
 		if err != nil {
 			return "", err
 		}

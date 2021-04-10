@@ -10,16 +10,18 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containous/traefik/v2/pkg/config/env"
-	"github.com/containous/traefik/v2/pkg/config/flag"
-	"github.com/containous/traefik/v2/pkg/config/generator"
-	"github.com/containous/traefik/v2/pkg/config/parser"
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/log"
+	"github.com/traefik/paerser/env"
+	"github.com/traefik/paerser/flag"
+	"github.com/traefik/paerser/generator"
+	"github.com/traefik/paerser/parser"
+	"github.com/traefik/traefik/v2/cmd"
+	"github.com/traefik/traefik/v2/pkg/log"
 )
 
 func main() {
-	genStaticConfDoc("./docs/content/reference/static-configuration/env-ref.md", "", env.Encode)
+	genStaticConfDoc("./docs/content/reference/static-configuration/env-ref.md", "", func(i interface{}) ([]parser.Flat, error) {
+		return env.Encode(env.DefaultNamePrefix, i)
+	})
 	genStaticConfDoc("./docs/content/reference/static-configuration/cli-ref.md", "--", flag.Encode)
 	genKVDynConfDoc("./docs/content/reference/dynamic-configuration/kv-ref.md")
 }
@@ -27,7 +29,7 @@ func main() {
 func genStaticConfDoc(outputFile, prefix string, encodeFn func(interface{}) ([]parser.Flat, error)) {
 	logger := log.WithoutContext().WithField("file", outputFile)
 
-	element := &static.Configuration{}
+	element := &cmd.NewTraefikConfiguration().Configuration
 
 	generator.Generate(element)
 
@@ -62,7 +64,12 @@ THIS FILE MUST NOT BE EDITED BY HAND
 			continue
 		}
 
-		w.writeln("`" + prefix + strings.ReplaceAll(flat.Name, "[0]", "[n]") + "`:  ")
+		if prefix == "" {
+			w.writeln("`" + prefix + strings.ReplaceAll(flat.Name, "[0]", "_n") + "`:  ")
+		} else {
+			w.writeln("`" + prefix + strings.ReplaceAll(flat.Name, "[0]", "[n]") + "`:  ")
+		}
+
 		if flat.Default == "" {
 			w.writeln(flat.Description)
 		} else {

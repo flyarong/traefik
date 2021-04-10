@@ -69,6 +69,12 @@ Use a DNS-01 based challenge provider rather than HTTPS.
 `--certificatesresolvers.<name>.acme.dnschallenge.resolvers`:  
 Use following DNS servers to resolve the FQDN authority.
 
+`--certificatesresolvers.<name>.acme.eab.hmacencoded`:  
+Base64 encoded HMAC key from External CA.
+
+`--certificatesresolvers.<name>.acme.eab.kid`:  
+Key identifier from External CA.
+
 `--certificatesresolvers.<name>.acme.email`:  
 Email address used for registration.
 
@@ -81,6 +87,9 @@ HTTP challenge EntryPoint
 `--certificatesresolvers.<name>.acme.keytype`:  
 KeyType used for generating certificate private key. Allow value 'EC256', 'EC384', 'RSA2048', 'RSA4096', 'RSA8192'. (Default: ```RSA4096```)
 
+`--certificatesresolvers.<name>.acme.preferredchain`:  
+Preferred chain to use.
+
 `--certificatesresolvers.<name>.acme.storage`:  
 Storage to use. (Default: ```acme.json```)
 
@@ -92,6 +101,9 @@ Entry points definition. (Default: ```false```)
 
 `--entrypoints.<name>.address`:  
 Entry point address.
+
+`--entrypoints.<name>.enablehttp3`:  
+Enable HTTP3. (Default: ```false```)
 
 `--entrypoints.<name>.forwardedheaders.insecure`:  
 Trust all forwarded headers. (Default: ```false```)
@@ -109,7 +121,7 @@ Default middlewares for the routers linked to the entry point.
 Applies a permanent redirection. (Default: ```true```)
 
 `--entrypoints.<name>.http.redirections.entrypoint.priority`:  
-Priority of the generated router. (Default: ```2147483647```)
+Priority of the generated router. (Default: ```2147483646```)
 
 `--entrypoints.<name>.http.redirections.entrypoint.scheme`:  
 Scheme used for the redirection. (Default: ```https```)
@@ -159,14 +171,20 @@ ReadTimeout is the maximum duration for reading the entire request, including th
 `--entrypoints.<name>.transport.respondingtimeouts.writetimeout`:  
 WriteTimeout is the maximum duration before timing out writes of the response. If zero, no timeout is set. (Default: ```0```)
 
+`--entrypoints.<name>.udp.timeout`:  
+Timeout defines how long to wait on an idle session before releasing the related resources. (Default: ```3```)
+
 `--experimental.devplugin.gopath`:  
 plugin's GOPATH.
 
 `--experimental.devplugin.modulename`:  
 plugin's module name.
 
-`--experimental.pilot.token`:  
-Traefik Pilot token.
+`--experimental.http3`:  
+Enable HTTP3. (Default: ```false```)
+
+`--experimental.kubernetesgateway`:  
+Allow the Kubernetes gateway api provider usage. (Default: ```false```)
 
 `--experimental.plugins.<name>.modulename`:  
 plugin's module name.
@@ -175,7 +193,7 @@ plugin's module name.
 plugin's version.
 
 `--global.checknewversion`:  
-Periodically check if a new version has been released. (Default: ```false```)
+Periodically check if a new version has been released. (Default: ```true```)
 
 `--global.sendanonymoususage`:  
 Periodically send anonymous usage statistics. If the option is not specified, it will be enabled by default. (Default: ```false```)
@@ -285,6 +303,12 @@ Prefix to use for metrics collection. (Default: ```traefik```)
 `--metrics.statsd.pushinterval`:  
 StatsD push interval. (Default: ```10```)
 
+`--pilot.dashboard`:  
+Enable Traefik Pilot in the dashboard. (Default: ```true```)
+
+`--pilot.token`:  
+Traefik Pilot token.
+
 `--ping`:  
 Enable ping. (Default: ```false```)
 
@@ -327,6 +351,9 @@ TLS key
 `--providers.consul.username`:  
 KV Username
 
+`--providers.consulcatalog`:  
+Enable ConsulCatalog backend with default settings. (Default: ```false```)
+
 `--providers.consulcatalog.cache`:  
 Use local agent caching for catalog reads. (Default: ```false```)
 
@@ -337,7 +364,7 @@ Constraints is an expression that Traefik matches against the container's labels
 Default rule. (Default: ```Host(`{{ normalize .Name }}`)```)
 
 `--providers.consulcatalog.endpoint.address`:  
-The address of the Consul server (Default: ```http://127.0.0.1:8500```)
+The address of the Consul server (Default: ```127.0.0.1:8500```)
 
 `--providers.consulcatalog.endpoint.datacenter`:  
 Data center to use. If not provided, the default agent data center is used
@@ -379,7 +406,7 @@ Expose containers by default. (Default: ```true```)
 Prefix for consul service tags. Default 'traefik' (Default: ```traefik```)
 
 `--providers.consulcatalog.refreshinterval`:  
-Interval for check Consul API. Default 100ms (Default: ```15```)
+Interval for check Consul API. Default 15s (Default: ```15```)
 
 `--providers.consulcatalog.requireconsistent`:  
 Forces the read to be fully consistent. (Default: ```false```)
@@ -401,6 +428,9 @@ Docker server endpoint. Can be a tcp or a unix socket endpoint. (Default: ```uni
 
 `--providers.docker.exposedbydefault`:  
 Expose containers by default. (Default: ```true```)
+
+`--providers.docker.httpclienttimeout`:  
+Client timeout for HTTP connections. (Default: ```0```)
 
 `--providers.docker.network`:  
 Default Docker network used.
@@ -431,6 +461,9 @@ Use the ip address from the bound port, rather than from the inner network. (Def
 
 `--providers.docker.watch`:  
 Watch Docker Swarm events. (Default: ```true```)
+
+`--providers.ecs`:  
+Enable AWS ECS backend with default settings. (Default: ```false```)
 
 `--providers.ecs.accesskeyid`:  
 The AWS credentials access key to use for making requests
@@ -531,11 +564,11 @@ TLS key
 `--providers.kubernetescrd`:  
 Enable Kubernetes backend with default settings. (Default: ```false```)
 
+`--providers.kubernetescrd.allowcrossnamespace`:  
+Allow cross namespace resource reference. (Default: ```true```)
+
 `--providers.kubernetescrd.certauthfilepath`:  
 Kubernetes certificate authority file path (not needed for in-cluster client).
-
-`--providers.kubernetescrd.disablepasshostheaders`:  
-Kubernetes disable PassHost Headers. (Default: ```false```)
 
 `--providers.kubernetescrd.endpoint`:  
 Kubernetes server endpoint (required for external cluster client).
@@ -555,20 +588,38 @@ Ingress refresh throttle duration (Default: ```0```)
 `--providers.kubernetescrd.token`:  
 Kubernetes bearer token (not needed for in-cluster client).
 
+`--providers.kubernetesgateway`:  
+Enable Kubernetes gateway api provider with default settings. (Default: ```false```)
+
+`--providers.kubernetesgateway.certauthfilepath`:  
+Kubernetes certificate authority file path (not needed for in-cluster client).
+
+`--providers.kubernetesgateway.endpoint`:  
+Kubernetes server endpoint (required for external cluster client).
+
+`--providers.kubernetesgateway.labelselector`:  
+Kubernetes label selector to select specific GatewayClasses.
+
+`--providers.kubernetesgateway.namespaces`:  
+Kubernetes namespaces.
+
+`--providers.kubernetesgateway.throttleduration`:  
+Kubernetes refresh throttle duration (Default: ```0```)
+
+`--providers.kubernetesgateway.token`:  
+Kubernetes bearer token (not needed for in-cluster client).
+
 `--providers.kubernetesingress`:  
 Enable Kubernetes backend with default settings. (Default: ```false```)
 
 `--providers.kubernetesingress.certauthfilepath`:  
 Kubernetes certificate authority file path (not needed for in-cluster client).
 
-`--providers.kubernetesingress.disablepasshostheaders`:  
-Kubernetes disable PassHost Headers. (Default: ```false```)
-
 `--providers.kubernetesingress.endpoint`:  
 Kubernetes server endpoint (required for external cluster client).
 
 `--providers.kubernetesingress.ingressclass`:  
-Value of kubernetes.io/ingress.class annotation to watch for.
+Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for.
 
 `--providers.kubernetesingress.ingressendpoint.hostname`:  
 Hostname used for Kubernetes Ingress endpoints.
@@ -655,7 +706,7 @@ Display additional provider logs. (Default: ```false```)
 Watch provider. (Default: ```true```)
 
 `--providers.providersthrottleduration`:  
-Backends throttle duration: minimum duration between 2 events from providers before applying a new configuration. It avoids unnecessary reloads if multiples events are sent in a short amount of time. (Default: ```0```)
+Backends throttle duration: minimum duration between 2 events from providers before applying a new configuration. It avoids unnecessary reloads if multiples events are sent in a short amount of time. (Default: ```2```)
 
 `--providers.rancher`:  
 Enable Rancher backend with default settings. (Default: ```false```)
@@ -763,7 +814,7 @@ The amount of time to wait for a server's response headers after fully writing t
 Disable SSL certificate verification. (Default: ```false```)
 
 `--serverstransport.maxidleconnsperhost`:  
-If non-zero, controls the maximum idle (keep-alive) to keep per-host. If zero, DefaultMaxIdleConnsPerHost is used (Default: ```0```)
+If non-zero, controls the maximum idle (keep-alive) to keep per-host. If zero, DefaultMaxIdleConnsPerHost is used (Default: ```200```)
 
 `--serverstransport.rootcas`:  
 Add cert file for self-signed certificate.
@@ -857,6 +908,9 @@ Password for basic http authentication when sending spans to jaeger-collector.
 
 `--tracing.jaeger.collector.user`:  
 User for basic http authentication when sending spans to jaeger-collector.
+
+`--tracing.jaeger.disableattemptreconnecting`:  
+Disable the periodic re-resolution of the agent's hostname and reconnection if there was a change. (Default: ```true```)
 
 `--tracing.jaeger.gen128bit`:  
 Generate 128 bit span IDs. (Default: ```false```)

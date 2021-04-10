@@ -1,11 +1,20 @@
 package main
 
 import (
-	"github.com/containous/traefik/v2/pkg/config/static"
-	"github.com/containous/traefik/v2/pkg/plugins"
+	"github.com/traefik/traefik/v2/pkg/config/static"
+	"github.com/traefik/traefik/v2/pkg/plugins"
 )
 
 const outputDir = "./plugins-storage/"
+
+func createPluginBuilder(staticConfiguration *static.Configuration) (*plugins.Builder, error) {
+	client, plgs, devPlugin, err := initPlugins(staticConfiguration)
+	if err != nil {
+		return nil, err
+	}
+
+	return plugins.NewBuilder(client, plgs, devPlugin)
+}
 
 func initPlugins(staticCfg *static.Configuration) (*plugins.Client, map[string]plugins.Descriptor, *plugins.DevPlugin, error) {
 	if !isPilotEnabled(staticCfg) || !hasPlugins(staticCfg) {
@@ -14,7 +23,7 @@ func initPlugins(staticCfg *static.Configuration) (*plugins.Client, map[string]p
 
 	opts := plugins.ClientOptions{
 		Output: outputDir,
-		Token:  staticCfg.Experimental.Pilot.Token,
+		Token:  staticCfg.Pilot.Token,
 	}
 
 	client, err := plugins.NewClient(opts)
@@ -31,12 +40,10 @@ func initPlugins(staticCfg *static.Configuration) (*plugins.Client, map[string]p
 }
 
 func isPilotEnabled(staticCfg *static.Configuration) bool {
-	return staticCfg.Experimental != nil &&
-		staticCfg.Experimental.Pilot != nil &&
-		staticCfg.Experimental.Pilot.Token != ""
+	return staticCfg.Pilot != nil && staticCfg.Pilot.Token != ""
 }
 
 func hasPlugins(staticCfg *static.Configuration) bool {
 	return staticCfg.Experimental != nil &&
-		len(staticCfg.Experimental.Plugins) > 0 || staticCfg.Experimental.DevPlugin != nil
+		(len(staticCfg.Experimental.Plugins) > 0 || staticCfg.Experimental.DevPlugin != nil)
 }
